@@ -1877,6 +1877,17 @@
         }
 
         /**
+         * 格式化端口范围显示（Issue #5）
+         * 使用 "起始-结束" 明确区间，避免旧版 "3000:2" 被误读为端口/协议或范围。
+         */
+        function formatPortRange(startPort, endPort) {
+            if (endPort <= startPort) {
+                return startPort.toString();
+            }
+            return `${startPort}-${endPort}`;
+        }
+
+        /**
          * 构造端口访问链接（Issue #4/#5/#6）
          * 沿用当前页面协议与主机名，仅替换端口；新标签打开并阻断 opener。
          */
@@ -1884,19 +1895,6 @@
             const scheme = location.protocol === 'https:' ? 'https' : 'http';
             const hostname = location.hostname || 'localhost';
             return `${scheme}://${hostname}:${port}/`;
-        }
-
-        /**
-         * 格式化端口范围显示
-         * 将 51008-51009 格式化为 51008:9
-         */
-        function formatPortRange(startPort, endPort) {
-            const range = endPort - startPort + 1;
-            if (range <= 1) {
-                return startPort.toString();
-            }
-            // 使用[port:num]格式显示连续端口范围
-            return `${startPort}:${range}`;
         }
 
         /**
