@@ -696,6 +696,17 @@
             font-size: 1.2rem;
         }
 
+        /* 端口跳转链接（Issue #4/#5/#6）：默认保持原有配色，hover 才提示可点 */
+        .port-link {
+            color: inherit;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .port-link:hover,
+        .port-link:focus {
+            text-decoration: underline;
+        }
+
         .container-name {
             font-size: 0.8rem;
             color: #666;
@@ -1866,6 +1877,16 @@
         }
 
         /**
+         * 构造端口访问链接（Issue #4/#5/#6）
+         * 沿用当前页面协议与主机名，仅替换端口；新标签打开并阻断 opener。
+         */
+        function buildPortUrl(port) {
+            const scheme = location.protocol === 'https:' ? 'https' : 'http';
+            const hostname = location.hostname || 'localhost';
+            return `${scheme}://${hostname}:${port}/`;
+        }
+
+        /**
          * 格式化端口范围显示
          * 将 51008-51009 格式化为 51008:9
          */
@@ -1960,12 +1981,13 @@
                         (card.source === 'docker' ? (card.container || card.container_name || 'Docker容器') : (card.process || '系统服务'));
                     const fullName = displayName;
                     
-                    // 处理Docker容器端口显示格式
+                    // 处理Docker容器端口显示格式（端口号可点击跳转，Issue #4/#5/#6）
+                    const portLinkAttrs = `href="${buildPortUrl(card.port)}" target="_blank" rel="noopener noreferrer" title="在新标签打开 http(s)://主机名:${card.port}/" class="port-link"`;
                     let portDisplayHtml = '';
                     if (card.source === 'docker' && card.container_port) {
                         portDisplayHtml = `
                             <div class="port-display">
-                                <div class="host-port">${card.port}</div>
+                                <div class="host-port"><a ${portLinkAttrs}>${card.port}</a></div>
                                 <div class="mapped-port">(${card.container_port})</div>
                             </div>
                         `;
@@ -1973,12 +1995,12 @@
                         // host网络容器端口
                         portDisplayHtml = `
                             <div class="port-display">
-                                <div class="host-port">${card.port}</div>
+                                <div class="host-port"><a ${portLinkAttrs}>${card.port}</a></div>
                                 <div class="mapped-port">(host)</div>
                             </div>
                         `;
                     } else {
-                        portDisplayHtml = `<div class="port-number">${card.port}</div>`;
+                        portDisplayHtml = `<div class="port-number"><a ${portLinkAttrs}>${card.port}</a></div>`;
                     }
                     
                     // 检查是否为未知服务
@@ -2010,15 +2032,16 @@
                         </div>
                     `;
                     
-                    // 列表视图端口显示
+                    // 列表视图端口显示（同样可点击跳转，Issue #4/#5/#6）
+                    const listPortLink = `<a ${portLinkAttrs} style="color: inherit; text-decoration: none;">${card.port}</a>`;
                     let listPortDisplay = '';
                     if (card.source === 'docker' && card.container_port) {
-                        listPortDisplay = `${card.port} <span style="font-size: 0.8rem; color: #999;">(${card.container_port})</span>`;
+                        listPortDisplay = `${listPortLink} <span style="font-size: 0.8rem; color: #999;">(${card.container_port})</span>`;
                     } else if (card.source === 'docker' && card.is_host_network) {
                         // host网络容器端口
-                        listPortDisplay = `${card.port} <span style="font-size: 0.8rem; color: #999;">(host)</span>`;
+                        listPortDisplay = `${listPortLink} <span style="font-size: 0.8rem; color: #999;">(host)</span>`;
                     } else {
-                        listPortDisplay = card.port;
+                        listPortDisplay = listPortLink;
                     }
                     
                     // 列表视图内容
