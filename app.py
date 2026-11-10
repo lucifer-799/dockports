@@ -988,61 +988,72 @@ def api_save_config():
         if not data:
             return jsonify({'error': '无效的配置数据'}), 400
         
-        # 检查是否是添加单个端口的请求
-        if 'port' in data and 'service_name' in data:
-            port = data['port']
+        # 检查是否是添加端口的请求（支持单端口 port 或多端口 ports 数组，Issue #2）
+        if ('port' in data or 'ports' in data) and 'service_name' in data:
+            raw_ports = data.get('ports')
+            if raw_ports is None:
+                raw_ports = [data['port']]
+            if not isinstance(raw_ports, list) or not raw_ports:
+                return jsonify({'error': 'ports 必须是非空数组'}), 400
+            # 去重且保持顺序
+            ports = []
+            for p in raw_ports:
+                if not isinstance(p, int) or isinstance(p, bool) or p < 1 or p > 65535:
+                    return jsonify({'error': '端口号必须在1-65535之间'}), 400
+                if p not in ports:
+                    ports.append(p)
             service_name = data['service_name'].strip()
             service_type = data.get('service_type', 'host')  # 默认为host
-            
+
             if not service_name:
                 return jsonify({'error': '服务名称不能为空'}), 400
-            
-            # 验证端口号
-            if not isinstance(port, int) or port < 1 or port > 65535:
-                return jsonify({'error': '端口号必须在1-65535之间'}), 400
-            
+
             # 验证服务类型
             if service_type not in ['docker', 'host']:
                 return jsonify({'error': '服务类型必须是docker或host'}), 400
-            
+
             # 加载当前配置
             current_config = load_config()
-            
-            # 检查端口是否已存在，适配新的数据结构
-            existing_service = None
-            for service, config_value in current_config.items():
-                existing_port = None
-                if isinstance(config_value, dict) and 'port' in config_value:
-                    existing_port = config_value['port']
-                elif isinstance(config_value, int):
-                    existing_port = config_value
-                
-                if existing_port == port:
-                    existing_service = service
-                    break
-            
-            if existing_service:
-                # 更新现有端口的服务名称
-                del current_config[existing_service]
-                current_config[service_name] = {
-                    'port': port, 
+
+            # 先移除这些端口已有的旧条目（改名的场景），再逐个写回
+            for port in ports:
+                for service, config_value in list(current_config.items()):
+                    existing_port = None
+                    if isinstance(config_value, dict) and 'port' in config_value:
+                        existing_port = config_value['port']
+                    elif isinstance(config_value, int):
+                        existing_port = config_value
+                    if existing_port == port:
+                        del current_config[service]
+
+            # 收集剩余已占用的服务名，避免同名 key 覆盖（Issue #2: 一个容器多端口只对一个生效）
+            occupied_names = set(current_config.keys())
+            # 一个服务名对应多个端口时，依次使用 名称 / 名称-2 / 名称-3 ...
+            def unique_name(base, index):
+                candidate = base if index == 0 else f'{base}-{index + 1}'
+                while candidate in occupied_names:
+                    index += 1
+                    candidate = f'{base}-{index + 1}'
+                occupied_names.add(candidate)
+                return candidate
+
+            saved_names = []
+            for index, port in enumerate(ports):
+                name = unique_name(service_name, index)
+                current_config[name] = {
+                    'port': port,
                     'protocol': 'TCP',
                     'service_type': service_type
                 }
-            else:
-                # 添加新的端口配置
-                current_config[service_name] = {
-                    'port': port, 
-                    'protocol': 'TCP',
-                    'service_type': service_type
-                }
-            
+                saved_names.append(name)
+
             # 保存配置
             if save_config(current_config):
                 config = load_config()
+                port_label = str(ports[0]) if len(ports) == 1 else ','.join(str(p) for p in ports)
                 return jsonify({
-                    'success': True, 
-                    'message': f'端口 {port} 的服务名称已设置为 "{service_name}"（{service_type}）'
+                    'success': True,
+                    'message': f'端口 {port_label} 的服务名称已设置为 "{", ".join(saved_names)}"（{service_type}）'
                 })
             else:
                 return jsonify({'error': '配置保存失败'}), 500
