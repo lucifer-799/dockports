@@ -13,9 +13,9 @@ import subprocess
 import json
 import re
 import hmac
-import hashlib
+import secrets
+import threading
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
-from collections import defaultdict
 import logging
 from datetime import datetime, timedelta
 import os
@@ -43,13 +43,54 @@ DEFAULT_CONFIG_FILE = '/app/config/config.json'
 # 未设置 DOCKPORTS_AUTH_PASSWORD 时完全不启用鉴权，保持与上游一致的默认行为。
 AUTH_PASSWORD = os.environ.get('DOCKPORTS_AUTH_PASSWORD', '')
 AUTH_ENABLED = bool(AUTH_PASSWORD)
-# session 签名密钥：优先使用独立环境变量，否则由密码派生（重启后登录状态仍有效）
-AUTH_SECRET = os.environ.get('DOCKPORTS_SECRET_KEY') or hashlib.sha256(
-    ('dockports-session:' + AUTH_PASSWORD).encode('utf-8')
-).hexdigest()
+# session 签名密钥必须使用独立于密码的随机值（ocr 自审 high/security #1）：
+# 由密码派生会让持有 cookie 的人离线爆破弱密码、进而伪造任意登录态。
+# 生产/多副本/需要重启后保持登录时，请显式设置 DOCKPORTS_SECRET_KEY。
+AUTH_SECRET = os.environ.get('DOCKPORTS_SECRET_KEY')
+if not AUTH_SECRET:
+    AUTH_SECRET = secrets.token_hex(32)
+    if AUTH_ENABLED:
+        logger.warning('未设置 DOCKPORTS_SECRET_KEY，已生成临时随机会话密钥；'
+                       '重启后登录态失效，多副本实例请显式配置该变量')
 app.secret_key = AUTH_SECRET
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# 登录失败限流（ocr 自审 medium/security #4）：内存计数 + 基于时间戳的指数退避，不引入新依赖。
+# 单实例 homelab 足够；成功登录后清空对应 IP 的计数。
+# LOGIN_FAILURES[ip] = (连续失败次数, 上次失败时间戳)；退避窗口内直接拒绝，不校验密码。
+LOGIN_FAILURES = {}
+LOGIN_FAILURES_LOCK = threading.Lock()
+LOGIN_MAX_FAILURES = 5          # 连续失败达到该次数后开始退避
+LOGIN_BASE_DELAY = 1.0         # 首次退避秒数，之后指数递增
+LOGIN_MAX_DELAY = 30.0         # 退避上限
+
+
+def _backoff_delay(failures):
+    return min(LOGIN_BASE_DELAY * (2 ** (failures - LOGIN_MAX_FAILURES)), LOGIN_MAX_DELAY)
+
+
+def login_backoff_remaining(client_ip):
+    """返回该 IP 还需等待的秒数（0 表示无需等待）。"""
+    with LOGIN_FAILURES_LOCK:
+        failures, last_ts = LOGIN_FAILURES.get(client_ip, (0, 0.0))
+    if failures < LOGIN_MAX_FAILURES:
+        return 0
+    return max(0.0, _backoff_delay(failures) - (time.time() - last_ts))
+
+
+def record_login_failure(client_ip):
+    with LOGIN_FAILURES_LOCK:
+        failures, _ = LOGIN_FAILURES.get(client_ip, (0, 0.0))
+        failures += 1
+        LOGIN_FAILURES[client_ip] = (failures, time.time())
+        return failures
+
+
+def clear_login_failures(client_ip):
+    with LOGIN_FAILURES_LOCK:
+        LOGIN_FAILURES.pop(client_ip, None)
+
 
 # 免鉴权端点：登录/登出/健康检查/静态资源
 AUTH_FREE_ENDPOINTS = {'login', 'logout', 'healthz', 'static'}
@@ -78,12 +119,22 @@ def login():
             or '\\' in next_path):
         next_path = ''
     if request.method == 'POST':
-        supplied = request.form.get('password', '')
-        if hmac.compare_digest(supplied, AUTH_PASSWORD):
-            session['authenticated'] = True
-            return redirect(next_path or url_for('index'))
-        error = '访问密码不正确'
-        logger.warning('登录失败: 访问密码不正确')
+        client_ip = request.remote_addr or 'unknown'
+        wait = login_backoff_remaining(client_ip)
+        if wait > 0:
+            # 退避期内直接拒绝，不校验密码，避免在线爆破
+            logger.warning('登录退避中: ip=%s wait=%.1fs', client_ip, wait)
+            error = f'尝试过于频繁，请约 {int(wait) + 1} 秒后重试'
+        else:
+            supplied = request.form.get('password', '')
+            # UTF-8 bytes 比较（ocr 自审 low/bug #5）：兼容非 ASCII 密码，避免 TypeError 变 500
+            if hmac.compare_digest(supplied.encode('utf-8'), AUTH_PASSWORD.encode('utf-8')):
+                clear_login_failures(client_ip)
+                session['authenticated'] = True
+                return redirect(next_path or url_for('index'))
+            failures = record_login_failure(client_ip)
+            error = '访问密码不正确'
+            logger.warning('登录失败: 访问密码不正确 (ip=%s, 连续失败=%d)', client_ip, failures)
     return render_template('login.html', error=error, next_path=next_path)
 
 
@@ -1054,6 +1105,9 @@ def api_save_config():
         if ('port' in data or 'ports' in data) and 'service_name' in data:
             raw_ports = data.get('ports')
             if raw_ports is None:
+                # 客户端可显式传 ports:null，此时必须回退到 port；两者皆无应返回 400（ocr 自审 #2）
+                if 'port' not in data:
+                    return jsonify({'error': '缺少 port 或 ports 字段'}), 400
                 raw_ports = [data['port']]
             if not isinstance(raw_ports, list) or not raw_ports:
                 return jsonify({'error': 'ports 必须是非空数组'}), 400
@@ -1064,7 +1118,11 @@ def api_save_config():
                     return jsonify({'error': '端口号必须在1-65535之间'}), 400
                 if p not in ports:
                     ports.append(p)
-            service_name = data['service_name'].strip()
+            # 非字符串输入先校验类型，避免 .strip() 抛 AttributeError 变成 500（ocr 自审 #3）
+            service_name = data['service_name']
+            if not isinstance(service_name, str):
+                return jsonify({'error': '服务名称必须是字符串'}), 400
+            service_name = service_name.strip()
             service_type = data.get('service_type', 'host')  # 默认为host
 
             if not service_name:

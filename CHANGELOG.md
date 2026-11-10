@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-11-10 ocr 自审修复（开发改完 → 测试专家介入前的自检）
+
+用 `ocr v1.13.7`（内网 new-api / `deepseek-v4-pro`）对 `8f7ff5f..HEAD` 的净改动做一次代码审查。
+口径说明：`main == HEAD`，按补充要求给的 `--from main --to HEAD` 会得到空 diff，故据实改为
+`--from 8f7ff5f --to HEAD`（上游基线 → 本次改动）。preview：4 个代码文件、`+359 -89`
+（CHANGELOG/README 被规则按扩展名排除）；实际审查 4 文件、耗时 17m47s、0 次 LLM 失败，
+结果 5 条发现（high 1 / medium 3 / low 1），全部在 `app.py`，**已全部修复**，未留悬置项。
+
+| # | 级别/类别 | 发现 | 处理 |
+|---|---|---|---|
+| 1 | high / security | session 签名密钥由密码派生 → 持 cookie 者可离线爆破弱密码并伪造登录态 | 改为 `secrets.token_hex(32)` 随机密钥；`DOCKPORTS_SECRET_KEY` 可显式固定；未设置且启用鉴权时启动日志 warning 提示「重启/多副本需固定密钥」 |
+| 2 | medium / bug | `ports: null` 且无 `port` 时 `data['port']` 抛 KeyError → 500 | 显式判缺，返回 400 `缺少 port 或 ports 字段` |
+| 3 | medium / bug | `service_name` 非字符串时 `.strip()` 抛 AttributeError → 500 | 先 `isinstance(str)` 校验，返回 400 `服务名称必须是字符串` |
+| 4 | medium / security | `/login` 无限流，可在线爆破密码 | 自实现**基于时间戳**的内存计数 + 指数退避（连续 5 次失败起、1→2→4…上限 30s，退避窗口内直接拒绝且不校验密码，`threading.Lock` 并发安全，成功登录清空）；**不引入 flask-limiter**，避免改 `requirements.txt` 与依赖面 |
+| 5 | low / bug | `hmac.compare_digest` 传 str 时非 ASCII 密码抛 TypeError → 500 | 两侧统一 `.encode('utf-8')` 后按 bytes 比较 |
+
+涉及文件：`app.py`（5 处）、`README.md`（密钥/限流说明同步）。
+未改 `requirements.txt`、未新增依赖；鉴权仍默认关闭，向后兼容不变。
+
+---
+
 ## 2026-11-10 内部 fork 首次合并
 
 基线：上游 `8f7ff5f`（v0.2.1）。上游无 CHANGELOG.md，本文件为新建。
