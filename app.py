@@ -59,31 +59,51 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # 登录失败限流（ocr 自审 medium/security #4）：内存计数 + 基于时间戳的指数退避，不引入新依赖。
 # 单实例 homelab 足够；成功登录后清空对应 IP 的计数。
 # LOGIN_FAILURES[ip] = (连续失败次数, 上次失败时间戳)；退避窗口内直接拒绝，不校验密码。
+# 增量复验 medium/security：加 TTL 淘汰 + 字典上限，避免多 IP 失败导致无界增长（内存泄漏/DoS）。
 LOGIN_FAILURES = {}
 LOGIN_FAILURES_LOCK = threading.Lock()
 LOGIN_MAX_FAILURES = 5          # 连续失败达到该次数后开始退避
 LOGIN_BASE_DELAY = 1.0         # 首次退避秒数，之后指数递增
 LOGIN_MAX_DELAY = 30.0         # 退避上限
+LOGIN_FAILURE_TTL = 3600.0     # 失败记录保留时长（秒），过期自动清理
+LOGIN_FAILURES_MAX_IPS = 4096  # 字典容量上限，超限先清理最旧的一批
 
 
 def _backoff_delay(failures):
     return min(LOGIN_BASE_DELAY * (2 ** (failures - LOGIN_MAX_FAILURES)), LOGIN_MAX_DELAY)
 
 
+def _prune_login_failures_locked(now):
+    """清理过期记录；调用方必须已持有 LOGIN_FAILURES_LOCK。"""
+    for ip, (_, ts) in list(LOGIN_FAILURES.items()):
+        if now - ts > LOGIN_FAILURE_TTL:
+            LOGIN_FAILURES.pop(ip, None)
+    # 仍超容量则按时间淘汰最旧的一批（保留最近的一半）
+    if len(LOGIN_FAILURES) > LOGIN_FAILURES_MAX_IPS:
+        oldest = sorted(LOGIN_FAILURES.items(), key=lambda kv: kv[1][1])
+        for ip, _ in oldest[:len(LOGIN_FAILURES) - LOGIN_FAILURES_MAX_IPS // 2]:
+            LOGIN_FAILURES.pop(ip, None)
+
+
 def login_backoff_remaining(client_ip):
     """返回该 IP 还需等待的秒数（0 表示无需等待）。"""
+    now = time.time()
     with LOGIN_FAILURES_LOCK:
+        _prune_login_failures_locked(now)
         failures, last_ts = LOGIN_FAILURES.get(client_ip, (0, 0.0))
     if failures < LOGIN_MAX_FAILURES:
         return 0
-    return max(0.0, _backoff_delay(failures) - (time.time() - last_ts))
+    return max(0.0, _backoff_delay(failures) - (now - last_ts))
 
 
 def record_login_failure(client_ip):
+    now = time.time()
     with LOGIN_FAILURES_LOCK:
+        _prune_login_failures_locked(now)
         failures, _ = LOGIN_FAILURES.get(client_ip, (0, 0.0))
         failures += 1
-        LOGIN_FAILURES[client_ip] = (failures, time.time())
+        LOGIN_FAILURES[client_ip] = (failures, now)
+        _prune_login_failures_locked(now)
         return failures
 
 

@@ -24,6 +24,19 @@
 涉及文件：`app.py`（5 处）、`README.md`（密钥/限流说明同步）。
 未改 `requirements.txt`、未新增依赖；鉴权仍默认关闭，向后兼容不变。
 
+### 增量复验（低 effort，仅审修复引入的增量）
+
+对 `7a2a92c..HEAD` 再跑一次 `--effort low`：1 个文件、5m26s、0 次 LLM 失败，
+**1 条 medium/security**，指向本轮新增的限流代码：`LOGIN_FAILURES` 是无界字典，
+不同 IP 失败记录永不淘汰 → 慢内存泄漏 / DoS。**已修复**：加 `LOGIN_FAILURE_TTL=3600s`
+过期淘汰 + `LOGIN_FAILURES_MAX_IPS=4096` 容量上限（超限时按时间淘汰最旧的一批），
+清理在 `LOGIN_FAILURES_LOCK` 内完成。修复后复验共 6 条发现，**全部处理、无悬置项**。
+
+验证：本机隔离 venv（Flask 2.3.3 / Werkzeug 2.3.7，与 `requirements.txt` 一致）
+用 Flask `test_client` 做了 16 项真实 HTTP/行为验证（含非 ASCII 密码登录、401/302、
+400 输入校验、`ports` 数组 `MySvc-2` 命名、限流窗口生效与释放、TTL/容量淘汰），全过。
+ubuntu 开发机无 flask/pip，未在开发机安装依赖，HTTP 验证在隔离环境完成、未污染任何环境。
+
 ---
 
 ## 2026-11-10 内部 fork 首次合并
