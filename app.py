@@ -669,7 +669,7 @@ class PortMonitor:
                     'type': 'used',
                     'source': source,
                     'protocol': protocol,
-                    'service_name': config_service_name or host_info.get('service_name', '未知服务'),
+                    'service_name': config_service_name or host_info.get('container_name') or host_info.get('service_name', '未知服务'),
                     'container': host_info.get('container_name'),
                     'is_host_network': is_host_container
                 }
