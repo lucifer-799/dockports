@@ -12,7 +12,9 @@ import docker
 import subprocess
 import json
 import re
-from flask import Flask, render_template, jsonify, request
+import hmac
+import hashlib
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from collections import defaultdict
 import logging
 from datetime import datetime, timedelta
@@ -36,6 +38,66 @@ CONFIG_DIR = '/app/config'
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'config.json')
 HIDDEN_PORTS_FILE = os.path.join(CONFIG_DIR, 'hidden_ports.json')
 DEFAULT_CONFIG_FILE = '/app/config/config.json'
+
+# 访问密码（Issue #7 / #5）：仅通过环境变量注入，密码不写入任何仓库文件。
+# 未设置 DOCKPORTS_AUTH_PASSWORD 时完全不启用鉴权，保持与上游一致的默认行为。
+AUTH_PASSWORD = os.environ.get('DOCKPORTS_AUTH_PASSWORD', '')
+AUTH_ENABLED = bool(AUTH_PASSWORD)
+# session 签名密钥：优先使用独立环境变量，否则由密码派生（重启后登录状态仍有效）
+AUTH_SECRET = os.environ.get('DOCKPORTS_SECRET_KEY') or hashlib.sha256(
+    ('dockports-session:' + AUTH_PASSWORD).encode('utf-8')
+).hexdigest()
+app.secret_key = AUTH_SECRET
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# 免鉴权端点：登录/登出/健康检查/静态资源
+AUTH_FREE_ENDPOINTS = {'login', 'logout', 'healthz', 'static'}
+
+
+@app.before_request
+def require_login():
+    """启用访问密码后，未登录请求统一引导到登录页（含所有 /api/*）。"""
+    if not AUTH_ENABLED or request.endpoint in AUTH_FREE_ENDPOINTS or session.get('authenticated'):
+        return None
+    # API 返回 401（便于脚本判断），页面重定向到登录页
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'error': '未登录或登录已失效', 'need_login': True}), 401
+    return redirect(url_for('login', next=request.path))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """访问密码登录页。"""
+    if not AUTH_ENABLED:
+        return redirect(url_for('index'))
+    error = ''
+    next_path = request.values.get('next') or ''
+    # 仅允许站内相对路径，避免开放重定向
+    if (not next_path.startswith('/') or next_path.startswith('//')
+            or '\\' in next_path):
+        next_path = ''
+    if request.method == 'POST':
+        supplied = request.form.get('password', '')
+        if hmac.compare_digest(supplied, AUTH_PASSWORD):
+            session['authenticated'] = True
+            return redirect(next_path or url_for('index'))
+        error = '访问密码不正确'
+        logger.warning('登录失败: 访问密码不正确')
+    return render_template('login.html', error=error, next_path=next_path)
+
+
+@app.route('/logout')
+def logout():
+    """退出登录。"""
+    session.pop('authenticated', None)
+    return redirect(url_for('login'))
+
+
+@app.route('/healthz')
+def healthz():
+    """健康检查端点（免鉴权，供 Dockerfile HEALTHCHECK 使用）。"""
+    return jsonify({'status': 'ok'})
 
 def init_config():
     """初始化配置文件"""

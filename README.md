@@ -24,6 +24,19 @@
 
 一个现代化的Docker容器端口监控和可视化工具，帮助您轻松管理和监控NAS或服务器上的端口使用情况。
 
+> **📌 本仓库说明（内部 fork）**
+>
+> 本仓库是 `coracoo/DockPorts`（v0.2.1 / `8f7ff5f`）的**内部 fork**，用于 homelab 自建镜像。
+> 上游已停更，此处合入了原部署中的自定义改动，并一次性修复了若干上游 Issue
+> （访问密码鉴权、端口点击跳转、多端口服务命名、连续端口显示歧义）。
+> 变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+>
+> 本项目仍沿用上游的使用方式与配置格式；新增功能均为**可选**，默认行为与上游保持一致：
+> - 未设置 `DOCKPORTS_AUTH_PASSWORD` 时不启用登录鉴权；
+> - 端口跳转链接沿用当前页面主机名，无需额外配置。
+>
+> 上游地址：<https://github.com/coracoo/DockPorts>（无 LICENSE，内部自用）。
+
 ## ✨ 功能特性
 
 - 🐳 **Docker集成**: 通过Docker API实时监控容器端口映射
@@ -47,6 +60,23 @@
 - 响应式布局
 
 ## 🚀 快速开始
+
+### 🔐 访问密码（可选，Issue #7 / #5）
+
+默认不启用，行为与上游一致。启用方式：在 compose 的 `environment` 中增加
+`DOCKPORTS_AUTH_PASSWORD`（**不要写进本仓库的任何文件**）：
+
+```yaml
+environment:
+  - DOCKPORTS_PORT=7577
+  - DOCKPORTS_AUTH_PASSWORD=${DOCKPORTS_AUTH_PASSWORD}   # 从宿主机环境/.env 注入
+```
+
+- 启用后首页与所有 `/api/*` 都需要登录，登录页为 `/login`，退出为 `/logout`。
+- 密码**只从环境变量读取**，不写入 `config.json`、不落盘、不进镜像层。
+- 可选 `DOCKPORTS_SECRET_KEY` 自定义 session 签名密钥；未设置时由密码派生。
+- `/healthz` 免鉴权，供容器 `HEALTHCHECK` 使用（不受登录影响）。
+- 建议通过反向代理 + HTTPS 使用；密码校验使用 `hmac.compare_digest` 恒定时间比较。
 
 ### 📦 镜像获取
 

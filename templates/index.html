@@ -1354,6 +1354,19 @@
     </div>
 
     <script>
+        /**
+         * 统一处理鉴权失效（Issue #7/#5）：API 返回 401 时跳转登录页。
+         * 原生 fetch 包装一层，所有请求自动具备该能力。
+         */
+        const rawFetch = window.fetch.bind(window);
+        window.fetch = async function(...args) {
+            const response = await rawFetch(...args);
+            if (response.status === 401) {
+                window.location.href = '/login?next=' + encodeURIComponent(location.pathname);
+            }
+            return response;
+        };
+
         let isLoading = false;
         let portsData = [];
         let hiddenPorts = []; // 存储隐藏端口号的数组
@@ -2528,43 +2541,31 @@
                 return;
             }
             
-            // 批量保存端口配置
-            const promises = [];
+            // 批量保存端口配置（Issue #2）：一次性提交所有端口，
+            // 后端为同名服务自动加 -2/-3 后缀，避免并发请求互相覆盖。
+            const ports = [];
             for (let port = startPort; port <= endPort; port++) {
-                promises.push(
-                    fetch('/api/config', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            port: port,
-                            service_name: serviceName
-                        })
-                    }).then(response => response.json())
-                );
+                ports.push(port);
             }
-            
-            Promise.all(promises)
-            .then(results => {
-                const failedPorts = [];
-                results.forEach((result, index) => {
-                    if (!result.success) {
-                        failedPorts.push(startPort + index);
-                    }
-                });
-                
+
+            fetch('/api/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ports: ports,
+                    service_name: serviceName
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
                 closeEditModal();
-                
-                if (failedPorts.length === 0) {
-                    // 刷新端口数据
+                if (result.success) {
                     loadPorts();
-                    // 显示成功消息
-                    showMessage(`成功保存 ${endPort - startPort + 1} 个端口的配置`, 'success');
+                    showMessage(`成功保存 ${ports.length} 个端口的配置`, 'success');
                 } else {
-                    // 部分失败
-                    loadPorts();
-                    showMessage(`部分端口保存失败: ${failedPorts.join(', ')}`, 'error');
+                    showMessage('批量保存失败: ' + (result.error || '未知错误'), 'error');
                 }
             })
             .catch(error => {

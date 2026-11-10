@@ -44,9 +44,9 @@ ENV DOCKPORTS_PORT=7577
 # 暴露端口（默认7577，可通过环境变量或命令行参数修改）
 EXPOSE $DOCKPORTS_PORT
 
-# 健康检查（使用环境变量）
+# 健康检查（使用环境变量；/healthz 免鉴权，启用访问密码后仍可用）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${DOCKPORTS_PORT}/ || exit 1
+    CMD curl -f http://localhost:${DOCKPORTS_PORT}/healthz || exit 1
 
 # 启动应用（使用ENTRYPOINT支持命令行参数）
 ENTRYPOINT ["python", "app.py"]
