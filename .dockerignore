@@ -1,0 +1,44 @@
+# Docker 构建上下文排除（D2）
+# Dockerfile 使用 `COPY . .`，若不排除 .git/，构建机 clone 里带凭据的 remote URL
+# 会随镜像泄露（上游公开镜像即因此带出 ghs_ GitHub App token）。
+# 注意：templates/、config.json.example、requirements.txt、Dockerfile 必须保留，勿加入排除。
+
+# 版本控制与凭据相关
+.git/
+.gitignore
+.gitattributes
+
+# Python 缓存 / 编译产物
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 本地环境变量与凭据文件（任何形式都不进镜像）
+.env
+.env.*
+*.token
+*.key
+*.pem
+credentials/
+secrets/
+
+# OCR / 开发工具状态与临时产物
+.opencodereview/
+.ocr*
+ocr-result*.json
+dockports-review*.json
+dockports-recheck*.json
+*.log
+.vscode/
+.idea/
+.DS_Store
+
+# 测试临时产物
+test-results/
+coverage.out
+htmlcov/
+dist/
+build/

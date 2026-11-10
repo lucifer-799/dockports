@@ -146,8 +146,11 @@ def login():
             logger.warning('登录退避中: ip=%s wait=%.1fs', client_ip, wait)
             error = f'尝试过于频繁，请约 {int(wait) + 1} 秒后重试'
         else:
-            supplied = request.form.get('password', '')
-            # UTF-8 bytes 比较（ocr 自审 low/bug #5）：兼容非 ASCII 密码，避免 TypeError 变 500
+            # 空值/None 边界：表单缺字段或显式 null 时统一按空串处理，避免 .encode 抛异常
+            supplied = request.form.get('password') or ''
+            if not isinstance(supplied, str):
+                supplied = str(supplied)
+            # UTF-8 bytes 比较（D1 / ocr 自审 low/bug #5）：兼容非 ASCII 密码，避免 TypeError 变 500
             if hmac.compare_digest(supplied.encode('utf-8'), AUTH_PASSWORD.encode('utf-8')):
                 clear_login_failures(client_ip)
                 session['authenticated'] = True
@@ -970,7 +973,8 @@ port_monitor = PortMonitor()
 @app.route('/')
 def index():
     """主页面"""
-    return render_template('index.html')
+    # D3：仅在启用访问密码（即当前页面处于登录态）时显示退出入口
+    return render_template('index.html', auth_enabled=AUTH_ENABLED)
 
 @app.route('/api/ports')
 def api_ports():

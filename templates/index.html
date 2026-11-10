@@ -38,6 +38,7 @@
             padding: 2rem 0;
             text-align: center;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
         }
 
         .header h1 {
@@ -49,6 +50,32 @@
         .header p {
             font-size: 1.1rem;
             opacity: 0.9;
+        }
+
+        /* 退出登录入口（D3）：仅启用访问密码时显示，沿用 header 白色半透明配色 */
+        .logout-link {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.4rem 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            border-radius: 6px;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.12);
+            font-size: 0.85rem;
+            text-decoration: none;
+            transition: background 0.2s ease;
+        }
+        .logout-link:hover,
+        .logout-link:focus {
+            background: rgba(255, 255, 255, 0.25);
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            .logout-link { top: 0.6rem; right: 0.8rem; font-size: 0.78rem; }
         }
 
         .main-container {
@@ -1196,6 +1223,9 @@
 </head>
 <body>
     <div class="header">
+        {% if auth_enabled %}
+        <a class="logout-link" href="/logout" title="退出登录">🚪 退出登录</a>
+        {% endif %}
         <h1>DockPorts</h1>
         <p>容器端口监控与可视化工具</p>
     </div>

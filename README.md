@@ -72,7 +72,8 @@ environment:
   - DOCKPORTS_AUTH_PASSWORD=${DOCKPORTS_AUTH_PASSWORD}   # 从宿主机环境/.env 注入
 ```
 
-- 启用后首页与所有 `/api/*` 都需要登录，登录页为 `/login`，退出为 `/logout`。
+- 启用后首页与所有 `/api/*` 都需要登录，登录页为 `/login`，退出为 `/logout`；
+  首页 header 右上角会显示「退出登录」入口（仅在启用访问密码时可见）。
 - 密码**只从环境变量读取**，不写入 `config.json`、不落盘、不进镜像层。
 - `DOCKPORTS_SECRET_KEY`（可选）：session 签名密钥。**未设置时使用每次启动生成的随机密钥**，
   重启后登录态失效；需要在重启/多副本间保持登录时请显式配置一个固定的高强度随机值。

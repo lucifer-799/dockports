@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-11-10 修复 D1/D2/D3（测试第一轮静态复核）
+
+> 口径说明：测试专家第一轮静态复核基于 `7a2a92c`；实际仓库已先行推到 `e82f672`
+> （ocr 自审 2 个 commit），故本段按真实代码状态处理，不重复覆盖既有修复。
+
+| 编号 | 级别 | 结论与处置 |
+|---|---|---|
+| **D1** | 高 | `hmac.compare_digest(str, str)` 非 ASCII 密码抛 `TypeError` → 正确密码永远登不进、攻击者提交非 ASCII 得 500。**已在 `27f0da0` 修为两侧 `.encode('utf-8')` 后按 bytes 比较**（即 ocr 自审 low/bug #5 同一问题）。本次再补空值/None 边界：`request.form.get('password') or ''` + 非 str 强转，保证任何输入都不会在 `.encode()` 抛异常。「未设密码完全不启用」「`/healthz` 免鉴权」「开放重定向防护」均保持不变 |
+| **D2** | 中 | 新增 `.dockerignore`：排除 `.git/`、`__pycache__/`、`*.py[cod]`、`.env*`、`*.token`/`*.key`/`*.pem`、`.opencodereview/`、OCR 结果 JSON、常见测试/编辑器临时产物。`Dockerfile` 是 `COPY . .`，此前会把 `.git/` 连同可能的凭据 URL 打进镜像（上游公开镜像正是这样泄露 `ghs_` token）。**显式保留** `templates/`、`config.json.example`、`requirements.txt`、`Dockerfile` |
+| **D3** | 低 | `index.html` 全文 0 处 `logout`，README 却承诺 `/logout`。`index()` 渲染时传入 `auth_enabled`，模板在 header 右上角用 Jinja 条件渲染「🚪 退出登录」链接（指向 `/logout`）；**仅启用访问密码时可见**，鉴权关闭时不显示，样式沿用 header 白色半透明配色、含移动端适配 |
+
+### ocr 自审意见处置（job 9ee94c）
+
+两轮 ocr 共 6 条发现，已在本次之前的 2 个 commit **全部修复、无悬置项**：
+- `27f0da0`：high/security 1（session 密钥改 `secrets.token_hex(32)` 随机值，不再由密码派生）、
+  medium/bug 2（`ports:null` / `service_name` 非字符串 → 400 而非 500）、
+  medium/security 1（`/login` 基于时间戳的指数退避限流）、
+  low/bug 1（**即 D1**，`compare_digest` 改 UTF-8 bytes）。
+- `e82f672`：增量复验 medium/security 1（限流字典加 `LOGIN_FAILURE_TTL=3600s` +
+  `LOGIN_FAILURES_MAX_IPS=4096` 淘汰，杜绝无界增长）。
+
+本次没有新的 `severity=high/critical` 待处理；对 D1 按本次要求补了 None/空值边界加固。
+未引入任何新的 Python 依赖，`requirements.txt` 与 `Dockerfile` 的 pip 层未改。
+
+---
+
 ## 2026-11-10 ocr 自审修复（开发改完 → 测试专家介入前的自检）
 
 用 `ocr v1.13.7`（内网 new-api / `deepseek-v4-pro`）对 `8f7ff5f..HEAD` 的净改动做一次代码审查。
