@@ -5,6 +5,28 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.3] - 2026-11-23
+
+### Security
+- 修复列表视图「未知服务」卡片的协议徽章：`${card.protocol.toUpperCase()}` 此前直接拼进 `innerHTML`（未转义），
+  改为与同文件其它 4 处一致走 `renderProtocolBadges()`（内部已 `esc()`）。
+- `.dockerignore` 的 `*.token` / `*.key` 缺少 `**/` 前缀，无法匹配子目录文件；改为 `**/*.token` / `**/*.key`，
+  使「排除凭据文件」的本意真正生效。
+
+### Fixed
+- 端口批量命名接口的「读-改-写」整段纳入 `CONFIG_IO_LOCK`（此前只锁单次写入，并发
+  `load_config() → 修改 → save_config()` 仍会互相覆盖导致丢更新）；同时把该锁改为可重入 `RLock`，
+  避免与内部 `atomic_write_json()` 的同一把锁自死锁。
+- GitHub Actions 的 `latest` 标签在 tag 推送时不再缺失：`type=raw,value=latest` 的 `enable`
+  由 `{{is_default_branch}}`（对 tag ref 恒为 false）改为
+  `${{ github.ref_type == 'tag' || github.ref == 'refs/heads/main' }}`，main 与 `v*` 都产出 `latest`。
+
+### Known issues（未在本版处理）
+- `Dockerfile` 的 `HEALTHCHECK` 读取运行时 `DOCKPORTS_PORT`，但若通过命令行 `--port` 覆盖监听端口，
+  健康检查仍探环境变量端口 —— 需前端/后端协同改造，留待后续版本。
+- `app.py` 端口空隙（gap）生成在尾部区间的边界处理、以及 `index.html` 的三处小逻辑
+  （按钮 inline 事件冲突、`isPortHidden` 对 `unknown_range` 的判定、虚拟卡片生成）仍为已知缺陷，不影响发布。
+
 ## [1.0.2] - 2026-11-23
 
 ### Security

@@ -2207,7 +2207,7 @@
                                 </div>
                             </div>
                             <div style="display: flex; gap: 0.5rem; align-items: center; height: 24px;">
-                                ${card.protocol ? `<span style="font-size: 0.7rem; color: #666; background: #e2e8f0; padding: 0.2rem 0.4rem; border-radius: 4px; height: 20px; display: flex; align-items: center; line-height: 20px;">${card.protocol.toUpperCase()}</span>` : ''}
+                                ${card.protocol ? `<span style="font-size: 0.7rem; display: flex; align-items: center; height: 20px;">${renderProtocolBadges(card.protocol)}</span>` : ''}
                                 <button class="add-port-btn list-add-btn" onclick="editPortRangeName(${card.start_port}, ${card.end_port})" title="批量添加端口到配置文件">+</button>
                                 <span class="port-source-badge ${card.source}" style="height: 20px; display: flex; align-items: center; line-height: 20px;">${card.source === 'docker' ? 'Docker' : '宿主机'}</span>
                                 ${isHidden ? 

@@ -64,7 +64,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 LOGIN_FAILURES = {}
 LOGIN_FAILURES_LOCK = threading.Lock()
 # 配置文件写入锁 + 原子写（避免并发 load->改->save 竞态丢数据、避免截断写半成品）
-CONFIG_IO_LOCK = threading.Lock()
+CONFIG_IO_LOCK = threading.RLock()  # 可重入：整段读-改-写与内部原子写共用同一把锁
 
 def atomic_write_json(path, data):
     """原子写 JSON：写临时文件 -> fsync -> os.replace 替换目标。
@@ -1187,51 +1187,53 @@ def api_save_config():
             if service_type not in ['docker', 'host']:
                 return jsonify({'error': '服务类型必须是docker或host'}), 400
 
-            # 加载当前配置
-            current_config = load_config()
+            # 整段「读-改-写」持同一把锁：避免并发 load->modify->save 互相覆盖（丢更新）
+            with CONFIG_IO_LOCK:
+                # 加载当前配置
+                current_config = load_config()
 
-            # 先移除这些端口已有的旧条目（改名的场景），再逐个写回
-            for port in ports:
-                for service, config_value in list(current_config.items()):
-                    existing_port = None
-                    if isinstance(config_value, dict) and 'port' in config_value:
-                        existing_port = config_value['port']
-                    elif isinstance(config_value, int):
-                        existing_port = config_value
-                    if existing_port == port:
-                        del current_config[service]
+                # 先移除这些端口已有的旧条目（改名的场景），再逐个写回
+                for port in ports:
+                    for service, config_value in list(current_config.items()):
+                        existing_port = None
+                        if isinstance(config_value, dict) and 'port' in config_value:
+                            existing_port = config_value['port']
+                        elif isinstance(config_value, int):
+                            existing_port = config_value
+                        if existing_port == port:
+                            del current_config[service]
 
-            # 收集剩余已占用的服务名，避免同名 key 覆盖（Issue #2: 一个容器多端口只对一个生效）
-            occupied_names = set(current_config.keys())
-            # 一个服务名对应多个端口时，依次使用 名称 / 名称-2 / 名称-3 ...
-            def unique_name(base, index):
-                candidate = base if index == 0 else f'{base}-{index + 1}'
-                while candidate in occupied_names:
-                    index += 1
-                    candidate = f'{base}-{index + 1}'
-                occupied_names.add(candidate)
-                return candidate
+                # 收集剩余已占用的服务名，避免同名 key 覆盖（Issue #2: 一个容器多端口只对一个生效）
+                occupied_names = set(current_config.keys())
+                # 一个服务名对应多个端口时，依次使用 名称 / 名称-2 / 名称-3 ...
+                def unique_name(base, index):
+                    candidate = base if index == 0 else f'{base}-{index + 1}'
+                    while candidate in occupied_names:
+                        index += 1
+                        candidate = f'{base}-{index + 1}'
+                    occupied_names.add(candidate)
+                    return candidate
 
-            saved_names = []
-            for index, port in enumerate(ports):
-                name = unique_name(service_name, index)
-                current_config[name] = {
-                    'port': port,
-                    'protocol': 'TCP',
-                    'service_type': service_type
-                }
-                saved_names.append(name)
+                saved_names = []
+                for index, port in enumerate(ports):
+                    name = unique_name(service_name, index)
+                    current_config[name] = {
+                        'port': port,
+                        'protocol': 'TCP',
+                        'service_type': service_type
+                    }
+                    saved_names.append(name)
 
-            # 保存配置
-            if save_config(current_config):
-                config = load_config()
-                port_label = str(ports[0]) if len(ports) == 1 else ','.join(str(p) for p in ports)
-                return jsonify({
-                    'success': True,
-                    'message': f'端口 {port_label} 的服务名称已设置为 "{", ".join(saved_names)}"（{service_type}）'
-                })
-            else:
-                return jsonify({'error': '配置保存失败'}), 500
+                # 保存配置
+                if save_config(current_config):
+                    config = load_config()
+                    port_label = str(ports[0]) if len(ports) == 1 else ','.join(str(p) for p in ports)
+                    return jsonify({
+                        'success': True,
+                        'message': f'端口 {port_label} 的服务名称已设置为 "{", ".join(saved_names)}"（{service_type}）'
+                    })
+                else:
+                    return jsonify({'error': '配置保存失败'}), 500
         else:
             # 保存整个配置（原有功能）- 支持混合格式
             # 验证配置格式（支持混合格式）

@@ -35,7 +35,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 推 main → main + latest；推 v1.0.2 → 1.0.2 + 1.0 + latest
+      # 推 main → main + latest；推 v1.0.3 → 1.0.3 + 1.0 + latest
+      # latest 的 enable 同时覆盖 tag 与 main（原先 is_default_branch 对 tag 为 false，tag 推送拿不到 latest）
       - name: Extract metadata (tags & labels)
         id: meta
         uses: docker/metadata-action@v5
@@ -45,7 +46,7 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' || github.ref == 'refs/heads/main' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
