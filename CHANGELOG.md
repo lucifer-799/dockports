@@ -5,6 +5,15 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.1] - 2026-11-23
+
+### Added
+- 网页 favicon：新增 `static/favicon.svg`（自绘几何图标，集装箱 + 端口造型，未使用任何官方 logo）
+  与 `static/favicon.ico`（16/32/48/64 多尺寸），并在 `index.html` / `login.html` 的 `<head>` 中引用。
+- 页脚 GitHub 图标链接：`index.html` 右下角固定位置、`login.html` 页脚各加一个 inline SVG
+  octocat mark（18px、`fill=currentColor`、hover 提亮），指向
+  <https://github.com/lucifer-799/dockports>（新窗口打开，含 title/aria-label）。
+
 ## [1.0.0] - 2026-11-23
 
 ### Added
