@@ -1394,10 +1394,10 @@
                     </div>
                 </div>
                 <div class="lock-controls">
-                    <button id="lockRangeBtn" class="lock-btn" onclick="togglePortRangeLock()">
+                    <button id="lockRangeBtn" class="lock-btn">
                         🔓 锁定
                     </button>
-                    <button id="resetRangeBtn" class="reset-btn" onclick="resetPortRange()">
+                    <button id="resetRangeBtn" class="reset-btn">
                         🔄 解锁
                     </button>
                 </div>
@@ -1713,7 +1713,9 @@
             document.querySelectorAll('.protocol-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            if (['all', 'TCP', 'UDP'].includes(protocol)) {
+            // 白名单与 data-protocol 标记值保持一致（标记值是小写 tcp/udp）；
+            // 原来用大写 ['all','TCP','UDP'] 判断，导致点击 TCP/UDP 时高亮不更新
+            if (['all', 'tcp', 'udp'].includes(String(protocol).toLowerCase())) {
                 document.querySelector(`[data-protocol="${protocol}"]`).classList.add('active');
             }
             
@@ -1856,6 +1858,18 @@
                 }
             });
             
+            // 协议过滤（currentProtocol 为 all 时不过滤）：
+            // 此前 refreshPorts 走 filterPorts 但不含协议条件，刷新后会显示全部协议，
+            // 与顶部 protocol 按钮状态不一致；在此统一处理，两处调用都生效。
+            if (currentProtocol && currentProtocol !== 'all') {
+                const wantProto = String(currentProtocol).toUpperCase();
+                filteredCards = filteredCards.filter(function (card) {
+                    const cardProto = String(card.protocol || '').toUpperCase();
+                    if (!cardProto) return true;               // 无协议信息的卡片始终显示
+                    return cardProto.split(/[,\s\/]+/).includes(wantProto);
+                });
+            }
+
             // 对于"已隐藏"标签页，需要为不在原始数据中的隐藏端口创建虚拟卡片
             if (currentFilter === 'hidden') {
                 const existingHiddenPorts = new Set();
@@ -2184,7 +2198,7 @@
                     if (card.source === 'docker' && card.container_port) {
                         portDisplayHtml = `
                             <div class="port-display">
-                                <div class="host-port"><a ${portLinkAttrs}>${card.port}</a></div>
+                                <div class="host-port"><a ${portLinkAttrs}>${esc(card.port)}</a></div>
                                 <div class="mapped-port">(${esc(card.container_port)})</div>
                             </div>
                         `;
@@ -2192,12 +2206,12 @@
                         // host网络容器端口
                         portDisplayHtml = `
                             <div class="port-display">
-                                <div class="host-port"><a ${portLinkAttrs}>${card.port}</a></div>
+                                <div class="host-port"><a ${portLinkAttrs}>${esc(card.port)}</a></div>
                                 <div class="mapped-port">(host)</div>
                             </div>
                         `;
                     } else {
-                        portDisplayHtml = `<div class="port-number"><a ${portLinkAttrs}>${card.port}</a></div>`;
+                        portDisplayHtml = `<div class="port-number"><a ${portLinkAttrs}>${esc(card.port)}</a></div>`;
                     }
                     
                     // 检查是否为未知服务
@@ -2230,7 +2244,7 @@
                     `;
                     
                     // 列表视图端口显示（同样可点击跳转，Issue #4/#5/#6）
-                    const listPortLink = `<a ${portLinkAttrs} style="color: inherit; text-decoration: none;">${card.port}</a>`;
+                    const listPortLink = `<a ${portLinkAttrs} style="color: inherit; text-decoration: none;">${esc(card.port)}</a>`;
                     let listPortDisplay = '';
                     if (card.source === 'docker' && card.container_port) {
                         listPortDisplay = `${listPortLink} <span style="font-size: 0.8rem; color: #999;">(${esc(card.container_port)})</span>`;

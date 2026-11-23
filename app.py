@@ -976,11 +976,14 @@ class PortMonitor:
                     if card['port'] in hidden_ports:
                         should_hide = True
                 elif card['type'] == 'unknown_range':
-                    # 检查端口范围是否有任何端口被隐藏
+                    # 与前端 isPortHidden() 保持一致：只有「范围内全部端口都被隐藏」才整体隐藏；
+                    # 原实现「任一端口被隐藏即隐藏」，会把部分隐藏的范围整体吞掉（与前端渲染不一致）
+                    all_hidden = True
                     for port in range(card['start_port'], card['end_port'] + 1):
-                        if port in hidden_ports:
-                            should_hide = True
+                        if port not in hidden_ports:
+                            all_hidden = False
                             break
+                    should_hide = all_hidden
                 
                 if not should_hide:
                     filtered_port_cards.append(card)
@@ -1343,23 +1346,25 @@ def api_hide_port():
         if not isinstance(port, int) or port < 1 or port > 65535:
             return jsonify({'error': '端口号必须在1-65535之间'}), 400
         
-        hidden_ports = load_hidden_ports()
-        if port not in hidden_ports:
-            hidden_ports.append(port)
-            hidden_ports.sort()
-            
-            if save_hidden_ports(hidden_ports):
+        # 整段「读-改-写」持锁：避免并发 hide 请求互相覆盖（丢隐藏记录）
+        with CONFIG_IO_LOCK:
+            hidden_ports = load_hidden_ports()
+            if port not in hidden_ports:
+                hidden_ports.append(port)
+                hidden_ports.sort()
+
+                if save_hidden_ports(hidden_ports):
+                    return jsonify({
+                        'success': True,
+                        'message': f'端口 {port} 已隐藏'
+                    })
+                else:
+                    return jsonify({'error': '保存隐藏端口配置失败'}), 500
+            else:
                 return jsonify({
                     'success': True,
-                    'message': f'端口 {port} 已隐藏'
+                    'message': f'端口 {port} 已经被隐藏'
                 })
-            else:
-                return jsonify({'error': '保存隐藏端口配置失败'}), 500
-        else:
-            return jsonify({
-                'success': True,
-                'message': f'端口 {port} 已经被隐藏'
-            })
             
     except Exception as e:
         logger.error(f"隐藏端口失败: {e}")
@@ -1380,22 +1385,24 @@ def api_unhide_port():
         if not isinstance(port, int) or port < 1 or port > 65535:
             return jsonify({'error': '端口号必须在1-65535之间'}), 400
         
-        hidden_ports = load_hidden_ports()
-        if port in hidden_ports:
-            hidden_ports.remove(port)
-            
-            if save_hidden_ports(hidden_ports):
+        # 整段读-改-写持锁
+        with CONFIG_IO_LOCK:
+            hidden_ports = load_hidden_ports()
+            if port in hidden_ports:
+                hidden_ports.remove(port)
+
+                if save_hidden_ports(hidden_ports):
+                    return jsonify({
+                        'success': True,
+                        'message': f'端口 {port} 已取消隐藏'
+                    })
+                else:
+                    return jsonify({'error': '保存隐藏端口配置失败'}), 500
+            else:
                 return jsonify({
                     'success': True,
-                    'message': f'端口 {port} 已取消隐藏'
+                    'message': f'端口 {port} 未被隐藏'
                 })
-            else:
-                return jsonify({'error': '保存隐藏端口配置失败'}), 500
-        else:
-            return jsonify({
-                'success': True,
-                'message': f'端口 {port} 未被隐藏'
-            })
             
     except Exception as e:
         logger.error(f"取消隐藏端口失败: {e}")
@@ -1421,17 +1428,20 @@ def api_hide_ports_batch():
             if not isinstance(port, int) or port < 1 or port > 65535:
                 return jsonify({'error': f'端口号 {port} 无效，必须在1-65535之间'}), 400
         
-        hidden_ports = load_hidden_ports()
-        new_hidden_count = 0
-        
-        for port in ports:
-            if port not in hidden_ports:
-                hidden_ports.append(port)
-                new_hidden_count += 1
-        
-        hidden_ports.sort()
-        
-        if save_hidden_ports(hidden_ports):
+        # 整段读-改-写持锁（批量隐藏与单条隐藏共享同一把锁，避免交错覆盖）
+        with CONFIG_IO_LOCK:
+            hidden_ports = load_hidden_ports()
+            new_hidden_count = 0
+
+            for port in ports:
+                if port not in hidden_ports:
+                    hidden_ports.append(port)
+                    new_hidden_count += 1
+
+            hidden_ports.sort()
+
+            saved = save_hidden_ports(hidden_ports)
+        if saved:
             return jsonify({
                 'success': True,
                 'message': f'成功隐藏 {new_hidden_count} 个端口'
@@ -1463,15 +1473,18 @@ def api_unhide_ports_batch():
             if not isinstance(port, int) or port < 1 or port > 65535:
                 return jsonify({'error': f'端口号 {port} 无效，必须在1-65535之间'}), 400
         
-        hidden_ports = load_hidden_ports()
-        removed_count = 0
-        
-        for port in ports:
-            if port in hidden_ports:
-                hidden_ports.remove(port)
-                removed_count += 1
-        
-        if save_hidden_ports(hidden_ports):
+        # 整段读-改-写持锁
+        with CONFIG_IO_LOCK:
+            hidden_ports = load_hidden_ports()
+            removed_count = 0
+
+            for port in ports:
+                if port in hidden_ports:
+                    hidden_ports.remove(port)
+                    removed_count += 1
+
+            saved = save_hidden_ports(hidden_ports)
+        if saved:
             return jsonify({
                 'success': True,
                 'message': f'成功取消隐藏 {removed_count} 个端口'

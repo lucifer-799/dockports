@@ -5,6 +5,36 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.6] - 2026-11-23
+
+### Security
+- **移除按钮双重绑定**（`templates/index.html`）：`#lockRangeBtn`、`#resetRangeBtn` 同时存在
+  inline `onclick` 与 `addEventListener('click')`，一次点击触发两次——端口范围锁定会「锁上后
+  立即解锁」，锁定功能实际不可用。已删除两处 inline `onclick`，统一由 `addEventListener` 接管，
+  点击只触发一次、范围锁定正常生效。
+- **补齐并发写锁**：`app.py` 的四个隐藏端口写接口（`/api/hide_port`、`/api/unhide_port`、
+  `/api/hide_ports_batch`、`/api/unhide_ports_batch`）此前 `load_hidden_ports() → 修改 →
+  save_hidden_ports()` 整段在 `CONFIG_IO_LOCK` 之外（1.0.3 只修了配置保存那处，这一处漏了）。
+  现已整段纳入 `with CONFIG_IO_LOCK:`（`RLock` 可重入，与内部原子写共用同一把锁不冲突）。
+
+### Fixed
+- 端口号在**文本节点**中的插值补 `esc()`（`${card.port}` → `${esc(card.port)}`，共 4 处；
+  属性侧已在 1.0.4 修复）。
+- 协议过滤白名单与 `data-protocol` 标记值大小写不一致（标记值为小写 `tcp`/`udp`，
+  判断用大写 `TCP`/`UDP`），导致点击 TCP/UDP 时按钮高亮不更新——已统一为小写比较。
+- `filterPorts()` 增加协议过滤：`refreshPorts()` 与 `switchProtocol()` 共用该函数，
+  此前刷新后不按当前协议过滤，会显示全部协议且与顶部按钮状态不一致。
+- 后端 `unknown_range` 的隐藏判定与前端对齐：由「范围内任一端口被隐藏即整体隐藏」
+  改为「范围全部端口被隐藏才隐藏」（前端已在 1.0.4 修正，后端此前未同步）。
+
+### Known issues（复核后确认无需改动）
+- `app.py` 的端口空隙（gap）生成已包含尾部区间（末尾 gap 卡片会扩展到范围上限，
+  否则生成 `final_gap`），复核后未发现遗漏。
+
+### Known issues（仍未处理）
+- `Dockerfile` 的 `HEALTHCHECK` 只读运行时 `DOCKPORTS_PORT`，通过命令行 `--port` 覆盖时探不到。
+- 深色主题采用「变量 + 覆盖」落地，个别历史硬编码颜色在暗夜下可能仍有轻微不协调。
+
 ## [1.0.5] - 2026-11-23
 
 ### Added
