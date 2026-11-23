@@ -1,9 +1,28 @@
 # 变更记录
 
-本仓库是 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，2025-07-16，上游已停更）的内部 fork。
-用户构建只打 `latest`，不强制 SemVer；此处按时间倒序记录每次变更，便于追溯。
+格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
----
+本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
+本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
+
+## [1.0.0] - 2026-11-23
+
+### Added
+- 可选访问密码鉴权（`DOCKPORTS_AUTH_PASSWORD`，未设置时行为与上游一致）、退出登录入口
+- 登录失败限流（含记录 TTL 淘汰与容量上限，避免无界增长）
+- 端口号可点击跳转到对应服务
+- 容器化发布：`compose.yaml`（公网镜像 `ghcr.io/lucifer-799/dockports`）、
+  `.github/workflows/build.yml`（Actions 自动构建推 ghcr）
+
+### Fixed
+- 一个容器多端口时服务名称只对一个生效
+- 连续端口显示改为明确区间，消除 `3000:2` 类歧义
+- 非 ASCII 密码边界场景加固
+- `.dockerignore` 排除 `.git/`，避免构建上下文把带凭据的 remote URL 带入镜像
+
+### Changed
+- Dockerfile 基础镜像可参数化；apt/pip 使用国内镜像源加速
+- 补充来源声明与 LICENSE（MIT，两方版权：coracoo 原作 + lucifer-799 fork）
 
 ## 2026-11-10 修复 D1/D2/D3（测试第一轮静态复核）
 

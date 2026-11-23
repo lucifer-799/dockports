@@ -1,0 +1,11 @@
+services:
+  dockports:
+    image: ghcr.io/lucifer-799/dockports:latest   # 固定版本改成 :1.0.0
+    container_name: dockports
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config:/app/config
+    environment:
+      - DOCKPORTS_PORT=7577
+    restart: unless-stopped

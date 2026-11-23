@@ -1,5 +1,5 @@
-# 基础镜像可参数化：默认仍为上游 python:3.11-slim，
-# 构建时可由流水线传 --build-arg BASE_IMAGE=10.10.10.204:10062/python:3.11-slim 走本地 Nexus
+# 基础镜像可参数化：默认 python:3.11-slim。
+# 如需走自建 registry 加速，可传 --build-arg BASE_IMAGE=<your-registry>/python:3.11-slim
 ARG BASE_IMAGE=python:3.11-slim
 FROM ${BASE_IMAGE}
 
