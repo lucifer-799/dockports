@@ -7,6 +7,8 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# 说明：第三方 action 一律 pin 到具体版本（而非可变 major tag），降低供应链风险。
+# 升级时请显式改版本号并复查 changelog。
 permissions:
   contents: read
   packages: write
@@ -17,10 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v3.10.0
 
       # ghcr 镜像名必须全小写：github.repository 可能含大写（如 DockPorts），
       # 用 shell 的 ${VAR,,} 转小写后写入 step output
@@ -29,7 +31,7 @@ jobs:
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v3.3.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -39,7 +41,7 @@ jobs:
       # latest 的 enable 同时覆盖 tag 与 main（原先 is_default_branch 对 tag 为 false，tag 推送拿不到 latest）
       - name: Extract metadata (tags & labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v5.7.0
         with:
           images: ${{ steps.img.outputs.name }}
           tags: |
@@ -49,7 +51,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' || github.ref == 'refs/heads/main' }}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v6.16.0
         with:
           context: .
           file: ./Dockerfile

@@ -5,6 +5,37 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.4] - 2026-11-23
+
+### Security
+- **修复 HTML 属性注入面**（`templates/index.html`）：`card.port` / `container_port` / `start_port` /
+  `end_port` / `port_count` / `available_count` / `source` 此前直接拼进 `href` / `title` / `class` /
+  `onclick` 属性值。本版做**类型校验 + 转义双重防护**：
+  - 新增 `toInt(v, min, max)`（`Number.isInteger` + 范围校验）与 `portAttr(v)`（端口 1–65535，
+    非法返回空串、不参与拼接）
+  - `portLinkAttrs`：`card.port` 先经 `toInt` 校验（非法则整段属性不生成），`href`/`title` 值再经 `esc()`
+  - `container_port` → `esc()`；`class` 中的 `card.source` → `esc()`
+  - `port_count` / `available_count` → `toInt(x, 0) ?? 0`（非整数一律显示 0）
+  - `onclick` 里的 `start_port`/`end_port`/`port` → 走 `portAttr()` 校验
+  - `querySelector` 的 `data-filter` / `data-view` / `data-protocol` 拼接前加枚举白名单校验
+- `.dockerignore` 的凭据类规则统一加 `**/` 前缀：`**/.env`、`**/.env.*`、`**/*.pem`、
+  `**/*.key`、`**/*.token`、`**/*.log`、`**/*.py[cod]` —— 子目录中的凭据文件才真正被排除。
+- GitHub Actions 的第三方 action 由可变 major tag **pin 到具体版本**：
+  `actions/checkout@v4.2.2`、`docker/setup-buildx-action@v3.10.0`、`docker/login-action@v3.3.0`、
+  `docker/metadata-action@v5.7.0`、`docker/build-push-action@v6.16.0`（降低供应链风险）。
+
+### Fixed
+- `isPortHidden()` 对 `unknown_range` 的判定与 `gap` 分支统一：此前「范围内任一端口被隐藏」
+  即整体判为已隐藏，导致部分隐藏的端口范围在列表中整体消失；改为「范围内全部端口都被隐藏」
+  才视为隐藏。
+
+### Known issues（本版未处理，不影响发布）
+- `index.html` 卡片的按钮同时存在 inline `onclick` 与 JS `addEventListener`，个别场景会触发两次
+  （需统一改为事件委托，涉及多处交互逻辑，留待后续）。
+- `Dockerfile` 的 `HEALTHCHECK` 只读取运行时 `DOCKPORTS_PORT`，通过命令行 `--port` 覆盖监听端口时
+  健康检查探不到（需前后端协同改造）。
+- `app.py` 端口空隙（gap）生成在尾部区间的边界处理。
+
 ## [1.0.3] - 2026-11-23
 
 ### Security

@@ -1420,6 +1420,24 @@
         /**
          * HTML 转义：把不可信数据（容器名/label/镜像名/协议，来自 Docker API）安全插入 innerHTML，防 Stored XSS。
          */
+        /**
+         * 数值校验：把外部传入的端口/计数转成合法整数，非法返回 null。
+         * 用于拼进 HTML 属性前做类型防护（非整数一律不拼）。
+         */
+        function toInt(v, min, max) {
+            const n = typeof v === 'number' ? v : Number(v);
+            if (!Number.isInteger(n)) return null;
+            if (min !== undefined && n < min) return null;
+            if (max !== undefined && n > max) return null;
+            return n;
+        }
+
+        /** 端口值（1-65535）：合法则返回数字字符串，否则空串 */
+        function portAttr(v) {
+            const n = toInt(v, 1, 65535);
+            return n === null ? '' : String(n);
+        }
+
         function esc(v) {
             if (v === null || v === undefined) return '';
             return String(v)
@@ -1457,13 +1475,14 @@
                 }
                 return true;
             } else if (card.type === 'unknown_range') {
-                // 对于未知端口范围，检查范围内是否有任何端口被隐藏
+                // 与 gap 分支一致：只有「范围内全部端口都被隐藏」才算整体隐藏；
+                // 原实现「任一端口被隐藏即返回 true」会把部分隐藏的范围整体判为已隐藏（误判）。
                 for (let port = card.start_port; port <= card.end_port; port++) {
-                    if (hiddenPorts.includes(port)) {
-                        return true;
+                    if (!hiddenPorts.includes(port)) {
+                        return false;
                     }
                 }
-                return false;
+                return true;
             } else {
                 // 对于单个端口，直接检查
                 return hiddenPorts.includes(card.port);
@@ -1562,7 +1581,10 @@
             document.querySelectorAll('.tab-link').forEach(link => {
                 link.classList.remove('active');
             });
-            document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+            // 白名单校验（值应为内部常量，仍显式约束，避免选择器拼接被污染）
+            if (['all', 'docker', 'host'].includes(filter)) {
+                document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+            }
             
             // 显示过滤后的端口
             displayPorts(filterPorts(portsData));
@@ -1576,7 +1598,9 @@
             document.querySelectorAll('.view-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            document.querySelector(`[data-view="${view}"]`).classList.add('active');
+            if (['card', 'list'].includes(view)) {
+                document.querySelector(`[data-view="${view}"]`).classList.add('active');
+            }
             
             // 更新容器类名
             const container = document.getElementById('portsContainer');
@@ -1594,7 +1618,9 @@
             document.querySelectorAll('.protocol-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            document.querySelector(`[data-protocol="${protocol}"]`).classList.add('active');
+            if (['all', 'TCP', 'UDP'].includes(protocol)) {
+                document.querySelector(`[data-protocol="${protocol}"]`).classList.add('active');
+            }
             
             // 重新加载端口数据
             loadPorts();
@@ -2055,13 +2081,16 @@
                     const fullName = displayName;
                     
                     // 处理Docker容器端口显示格式（端口号可点击跳转，Issue #4/#5/#6）
-                    const portLinkAttrs = `href="${buildPortUrl(card.port)}" target="_blank" rel="noopener noreferrer" title="在新标签打开 http(s)://主机名:${card.port}/" class="port-link"`;
+                    // 端口先做整数校验（非整数视为不可用，不拼链接），属性值统一 esc
+                    const _safePort = toInt(card.port, 1, 65535);
+                    const portLinkAttrs = _safePort === null ? '' :
+                        `href="${esc(buildPortUrl(_safePort))}" target="_blank" rel="noopener noreferrer" title="在新标签打开 http(s)://主机名:${_safePort}/" class="port-link"`;
                     let portDisplayHtml = '';
                     if (card.source === 'docker' && card.container_port) {
                         portDisplayHtml = `
                             <div class="port-display">
                                 <div class="host-port"><a ${portLinkAttrs}>${card.port}</a></div>
-                                <div class="mapped-port">(${card.container_port})</div>
+                                <div class="mapped-port">(${esc(card.container_port)})</div>
                             </div>
                         `;
                     } else if (card.source === 'docker' && card.is_host_network) {
@@ -2091,15 +2120,15 @@
                         </div>
                         <div class="port-card-footer">
                             <div class="port-card-actions">
-                                ${isUnknownService ? `<button class="add-port-btn" onclick="editPortName(${card.port})" title="添加端口到配置文件">+</button>` : ''}
+                                ${isUnknownService ? `<button class="add-port-btn" onclick="editPortName(${portAttr(card.port)})" title="添加端口到配置文件">+</button>` : ''}
                             </div>
                             <div class="port-card-center">
-                                <span class="port-source-badge ${card.source}">${card.source === 'docker' ? 'Docker' : '宿主机'}</span>
+                                <span class="port-source-badge ${esc(card.source)}">${card.source === 'docker' ? 'Docker' : '宿主机'}</span>
                             </div>
                             <div class="port-card-actions">
                                 ${isHidden ? 
-                                    `<button class="hide-port-btn" onclick="unhidePort(${card.port})" title="取消隐藏此端口">👁️</button>` :
-                                    `<button class="hide-port-btn" onclick="hidePort(${card.port})" title="隐藏此端口">👁️‍🗨️</button>`
+                                    `<button class="hide-port-btn" onclick="unhidePort(${portAttr(card.port)})" title="取消隐藏此端口">👁️</button>` :
+                                    `<button class="hide-port-btn" onclick="hidePort(${portAttr(card.port)})" title="隐藏此端口">👁️‍🗨️</button>`
                                 }
                             </div>
                         </div>
@@ -2109,7 +2138,7 @@
                     const listPortLink = `<a ${portLinkAttrs} style="color: inherit; text-decoration: none;">${card.port}</a>`;
                     let listPortDisplay = '';
                     if (card.source === 'docker' && card.container_port) {
-                        listPortDisplay = `${listPortLink} <span style="font-size: 0.8rem; color: #999;">(${card.container_port})</span>`;
+                        listPortDisplay = `${listPortLink} <span style="font-size: 0.8rem; color: #999;">(${esc(card.container_port)})</span>`;
                     } else if (card.source === 'docker' && card.is_host_network) {
                         // host网络容器端口
                         listPortDisplay = `${listPortLink} <span style="font-size: 0.8rem; color: #999;">(host)</span>`;
@@ -2130,11 +2159,11 @@
                              </div>
                              <div style="display: flex; gap: 0.5rem; align-items: center; height: 24px;">
                                  ${card.protocol ? renderProtocolBadges(card.protocol) : ''}
-                                 ${isUnknownService ? `<button class="add-port-btn list-add-btn" onclick="editPortName(${card.port})" title="添加端口到配置文件">+</button>` : ''}
-                                 <span class="port-source-badge ${card.source}" style="height: 20px; display: flex; align-items: center; line-height: 20px;">${card.source === 'docker' ? 'Docker' : '宿主机'}</span>
+                                 ${isUnknownService ? `<button class="add-port-btn list-add-btn" onclick="editPortName(${portAttr(card.port)})" title="添加端口到配置文件">+</button>` : ''}
+                                 <span class="port-source-badge ${esc(card.source)}" style="height: 20px; display: flex; align-items: center; line-height: 20px;">${card.source === 'docker' ? 'Docker' : '宿主机'}</span>
                                  ${isHidden ? 
-                                     `<button class="hide-port-btn list-hide-btn" onclick="unhidePort(${card.port})" title="取消隐藏此端口">👁️</button>` :
-                                     `<button class="hide-port-btn list-hide-btn" onclick="hidePort(${card.port})" title="隐藏此端口">👁️‍🗨️</button>`
+                                     `<button class="hide-port-btn list-hide-btn" onclick="unhidePort(${portAttr(card.port)})" title="取消隐藏此端口">👁️</button>` :
+                                     `<button class="hide-port-btn list-hide-btn" onclick="hidePort(${portAttr(card.port)})" title="隐藏此端口">👁️‍🗨️</button>`
                                  }
                              </div>
                          </div>
@@ -2148,7 +2177,7 @@
                     cardEl.innerHTML = `
                         <div class="port-number">⋯</div>
                         <div class="gap-info">${formatPortRange(card.start_port, card.end_port)}</div>
-                        <div class="gap-info">${card.available_count} 个可用端口</div>
+                        <div class="gap-info">${toInt(card.available_count, 0) ?? 0} 个可用端口</div>
                     `;
                     
                     // 列表视图内容
@@ -2156,7 +2185,7 @@
                         <div style="display: flex; align-items: center; gap: 1rem; flex: 1;">
                             <div style="font-size: 1rem; color: #a0aec0; min-width: 60px;">⋯</div>
                             <div style="color: #718096;">${formatPortRange(card.start_port, card.end_port)}</div>
-                            <div style="font-size: 0.9rem; color: #718096;">${card.available_count} 个可用端口</div>
+                            <div style="font-size: 0.9rem; color: #718096;">${toInt(card.available_count, 0) ?? 0} 个可用端口</div>
                         </div>
                         <div style="font-size: 0.8rem; color: #a0aec0;">可用范围</div>
                     `;
@@ -2176,21 +2205,21 @@
                         <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
                             <div class="port-number">${formatPortRange(card.start_port, card.end_port)}</div>
                             <div class="tooltip">
-                                <div class="service-name">未知服务 (${card.port_count}个端口)</div>
+                                <div class="service-name">未知服务 (${toInt(card.port_count, 0) ?? 0}个端口)</div>
                             </div>
                             ${card.protocol ? `<div style="margin-top: 0.2rem;">${renderProtocolBadges(card.protocol)}</div>` : ''}
                         </div>
                         <div class="port-card-footer">
                             <div class="port-card-actions">
-                                <button class="add-port-btn" onclick="editPortRangeName(${card.start_port}, ${card.end_port})" title="批量添加端口到配置文件">+</button>
+                                <button class="add-port-btn" onclick="editPortRangeName(${portAttr(card.start_port)}, ${portAttr(card.end_port)})" title="批量添加端口到配置文件">+</button>
                             </div>
                             <div class="port-card-center">
-                                <span class="port-source-badge ${card.source}">${card.source === 'docker' ? 'Docker' : '宿主机'}</span>
+                                <span class="port-source-badge ${esc(card.source)}">${card.source === 'docker' ? 'Docker' : '宿主机'}</span>
                             </div>
                             <div class="port-card-actions">
                                 ${isHidden ? 
-                                    `<button class="hide-port-btn" onclick="unhidePortRange(${card.start_port}, ${card.end_port})" title="取消隐藏此端口范围">👁️</button>` :
-                                    `<button class="hide-port-btn" onclick="hidePortRange(${card.start_port}, ${card.end_port})" title="隐藏此端口范围">👁️‍🗨️</button>`
+                                    `<button class="hide-port-btn" onclick="unhidePortRange(${portAttr(card.start_port)}, ${portAttr(card.end_port)})" title="取消隐藏此端口范围">👁️</button>` :
+                                    `<button class="hide-port-btn" onclick="hidePortRange(${portAttr(card.start_port)}, ${portAttr(card.end_port)})" title="隐藏此端口范围">👁️‍🗨️</button>`
                                 }
                             </div>
                         </div>
@@ -2203,16 +2232,16 @@
                             <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
                                 <span>${card.source === 'docker' ? '🐳' : '⚙️'}</span>
                                 <div class="tooltip" style="flex: 1; min-width: 0;">
-                                    <div class="process-name">未知服务 (${card.port_count}个端口)</div>
+                                    <div class="process-name">未知服务 (${toInt(card.port_count, 0) ?? 0}个端口)</div>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 0.5rem; align-items: center; height: 24px;">
                                 ${card.protocol ? `<span style="font-size: 0.7rem; display: flex; align-items: center; height: 20px;">${renderProtocolBadges(card.protocol)}</span>` : ''}
-                                <button class="add-port-btn list-add-btn" onclick="editPortRangeName(${card.start_port}, ${card.end_port})" title="批量添加端口到配置文件">+</button>
-                                <span class="port-source-badge ${card.source}" style="height: 20px; display: flex; align-items: center; line-height: 20px;">${card.source === 'docker' ? 'Docker' : '宿主机'}</span>
+                                <button class="add-port-btn list-add-btn" onclick="editPortRangeName(${portAttr(card.start_port)}, ${portAttr(card.end_port)})" title="批量添加端口到配置文件">+</button>
+                                <span class="port-source-badge ${esc(card.source)}" style="height: 20px; display: flex; align-items: center; line-height: 20px;">${card.source === 'docker' ? 'Docker' : '宿主机'}</span>
                                 ${isHidden ? 
-                                    `<button class="hide-port-btn list-hide-btn" onclick="unhidePortRange(${card.start_port}, ${card.end_port})" title="取消隐藏此端口范围">👁️</button>` :
-                                    `<button class="hide-port-btn list-hide-btn" onclick="hidePortRange(${card.start_port}, ${card.end_port})" title="隐藏此端口范围">👁️‍🗨️</button>`
+                                    `<button class="hide-port-btn list-hide-btn" onclick="unhidePortRange(${portAttr(card.start_port)}, ${portAttr(card.end_port)})" title="取消隐藏此端口范围">👁️</button>` :
+                                    `<button class="hide-port-btn list-hide-btn" onclick="hidePortRange(${portAttr(card.start_port)}, ${portAttr(card.end_port)})" title="隐藏此端口范围">👁️‍🗨️</button>`
                                 }
                             </div>
                         </div>

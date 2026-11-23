@@ -10,28 +10,28 @@
 
 # Python 缓存 / 编译产物
 __pycache__/
-*.py[cod]
+**/*.py[cod]
 *$py.class
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 
 # 本地环境变量与凭据文件（任何形式都不进镜像）
-.env
-.env.*
+**/.env
+**/.env.*
 **/*.token
 **/*.key
-*.pem
+**/*.pem
 credentials/
 secrets/
 
 # OCR / 开发工具状态与临时产物
 .opencodereview/
 .ocr*
-ocr-result*.json
+**/ocr-result*.json
 dockports-review*.json
 dockports-recheck*.json
-*.log
+**/*.log
 .vscode/
 .idea/
 .DS_Store
