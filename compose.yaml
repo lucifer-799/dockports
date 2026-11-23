@@ -3,6 +3,8 @@ services:
     image: ghcr.io/lucifer-799/dockports:latest   # 固定版本改成 :1.0.0
     container_name: dockports
     network_mode: host
+    # 以非 root 运行后，读取 docker.sock 需与宿主机 socket 属主组同组：
+    #   group_add: ["<docker-sock-gid>"]   # 宿主上: stat -c '%g' /var/run/docker.sock
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./config:/app/config

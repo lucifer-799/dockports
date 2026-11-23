@@ -15,6 +15,7 @@ import re
 import hmac
 import secrets
 import threading
+import tempfile
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 import logging
 from datetime import datetime, timedelta
@@ -62,6 +63,31 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # 增量复验 medium/security：加 TTL 淘汰 + 字典上限，避免多 IP 失败导致无界增长（内存泄漏/DoS）。
 LOGIN_FAILURES = {}
 LOGIN_FAILURES_LOCK = threading.Lock()
+# 配置文件写入锁 + 原子写（避免并发 load->改->save 竞态丢数据、避免截断写半成品）
+CONFIG_IO_LOCK = threading.Lock()
+
+def atomic_write_json(path, data):
+    """原子写 JSON：写临时文件 -> fsync -> os.replace 替换目标。
+
+    并发安全：文件级互斥（进程内）+ 原子替换（跨进程也不会看到半截文件）。
+    """
+    with CONFIG_IO_LOCK:
+        d = os.path.dirname(os.path.abspath(path)) or '.'
+        os.makedirs(d, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=d, prefix='.tmp-', suffix='.json')
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+
 LOGIN_MAX_FAILURES = 5          # 连续失败达到该次数后开始退避
 LOGIN_BASE_DELAY = 1.0         # 首次退避秒数，之后指数递增
 LOGIN_MAX_DELAY = 30.0         # 退避上限
@@ -204,8 +230,7 @@ def init_config():
                 "DockPorts:docker": "7575:tcp"
             }
             
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                json.dump(default_config, f, indent=2, ensure_ascii=False)
+            atomic_write_json(CONFIG_FILE, default_config)
             
             print(f"配置文件已创建（默认配置）: {CONFIG_FILE}")
         config_created = True
@@ -215,8 +240,7 @@ def init_config():
     # 初始化隐藏端口配置文件
     if not os.path.exists(HIDDEN_PORTS_FILE):
         # 创建空的隐藏端口配置文件
-        with open(HIDDEN_PORTS_FILE, 'w', encoding='utf-8') as f:
-            json.dump([], f, indent=2, ensure_ascii=False)
+        atomic_write_json(HIDDEN_PORTS_FILE, [])
         print(f"隐藏端口配置文件已创建: {HIDDEN_PORTS_FILE}")
     else:
         print(f"隐藏端口配置文件已存在: {HIDDEN_PORTS_FILE}")
@@ -307,8 +331,7 @@ def save_config(config):
             else:
                 raw_config[key] = value
         
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(raw_config, f, indent=2, ensure_ascii=False)
+        atomic_write_json(CONFIG_FILE, raw_config)
         return True
     except Exception as e:
         print(f"保存配置文件失败: {e}")
@@ -328,8 +351,7 @@ def load_hidden_ports():
 def save_hidden_ports(hidden_ports):
     """保存隐藏端口配置"""
     try:
-        with open(HIDDEN_PORTS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(hidden_ports, f, indent=2, ensure_ascii=False)
+        atomic_write_json(HIDDEN_PORTS_FILE, hidden_ports)
         return True
     except Exception as e:
         print(f"保存隐藏端口配置失败: {e}")
@@ -386,10 +408,14 @@ class PortMonitor:
                     if host_bindings:
                         for binding in host_bindings:
                             host_port = int(binding['HostPort'])
+                            # 保留协议：docker 的 container_port 形如 '80/tcp'、'53/udp'
+                            _cp = str(container_port)
+                            _proto = _cp.split('/')[1].upper() if '/' in _cp else 'TCP'
                             ports_info.append({
                                 'port': host_port,
                                 'container_name': container_name,
-                                'container_port': container_port,
+                                'container_port': _cp,
+                                'protocol': _proto,
                                 'type': 'docker_mapped'
                             })
                             logger.debug(f"发现映射端口: {host_port} -> {container_name}:{container_port}")
@@ -732,10 +758,15 @@ class PortMonitor:
                 if port < start_port or port > end_port:
                     continue
                     
-                tcp_ports.add(port)  # Docker端口映射通常是TCP
+                # 按容器实际协议归类（此前一律当 TCP，导致 udp 映射端口在 TCP 视图/过滤下错位）
+                _proto = str(port_info.get('protocol') or 'TCP').upper()
+                if _proto == 'UDP':
+                    udp_ports.add(port)
+                else:
+                    tcp_ports.add(port)
                 docker_port_map[port] = port_info
                 if port not in port_protocol_map:
-                    port_protocol_map[port] = 'TCP'
+                    port_protocol_map[port] = _proto
         
         # 根据协议过滤器选择端口
         if protocol_filter == 'TCP':
@@ -1248,8 +1279,7 @@ def api_save_config():
             
             # 直接保存原始格式的配置到文件
             try:
-                with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
+                atomic_write_json(CONFIG_FILE, data)
                 
                 # 更新全局配置（重新加载以确保一致性）
                 config = load_config()

@@ -42,3 +42,7 @@ coverage.out
 htmlcov/
 dist/
 build/
+
+# 运行时配置（由容器卷提供），不要把本地配置打进镜像
+config/config.json
+config/hidden_ports.json

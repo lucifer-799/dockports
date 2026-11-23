@@ -5,6 +5,24 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.2] - 2026-11-23
+
+### Security
+- **修复 Stored XSS**：`templates/index.html` 中 API 返回的容器名/label 派生字段（`displayName`、`fullName`）与端口协议字符串此前直接拼进 `innerHTML`。新增 `esc()` HTML 转义函数，卡片视图、列表视图与协议徽章渲染处的所有不可信插值均改为 `esc(...)`。
+- **修复脚本注入面**：GitHub Actions 的 Summary 步骤不再把 `${{ steps.meta.outputs.tags }}` 直接拼进 `run:`，改为经 `env:` 传入后用 `"$TAGS"` 引用。
+- **GHCR 镜像名强制小写**：新增一步用 shell `${GITHUB_REPOSITORY,,}` 计算小写镜像名，避免仓库名含大写（如 `DockPorts`）时 push 失败。
+- **容器以非 root 运行**：Dockerfile 新增 `useradd app`（uid 1000）、`COPY --chown=app:app`、`USER app`；`compose.yaml` 补充 `group_add` 说明（读取 docker.sock 需与宿主 socket 属主组同组）。
+- **并发持久化安全**：配置/隐藏端口写入改为 `atomic_write_json()`（临时文件 + `fsync` + `os.replace`，外加进程内 `CONFIG_IO_LOCK`），消除多请求 load→改→save 竞态与截断写。
+
+### Fixed
+- `refreshPorts` 刷新后不同步更新全局 `portsData`（此前只渲染响应，后续筛选/隐藏基于旧数据）→ 改为先更新 `portsData` 再 `displayPorts(filterPorts(...))`。
+- Docker 端口映射的**协议被丢弃**（一律当 TCP）→ `get_docker_ports` 保留 `protocol`（从 `80/tcp`、`53/udp` 解析），端口按实际协议归入 TCP/UDP 视图与过滤。
+- 移除上游作者的 `docker-publish.yml`（发布到其阿里云个人镜像仓库，且 `type=raw,latest` 对 tag ref 不生效导致 tag 不构建）；发布统一由 `build.yml` 承担，main 与 `v*` tag 均构建。
+
+### Changed
+- `.dockerignore` 排除运行时 `config/config.json` 与 `config/hidden_ports.json`，避免把本地配置打进镜像。
+- 依赖升级（仅升受 CVE 影响的包，不跳大版本）：Werkzeug `2.3.7 → 3.0.3`（CVE-2024-34069）、urllib3 `2.0.7 → 2.2.2`（CVE-2024-37891）、requests `2.31.0 → 2.32.3`（CVE-2024-35195）、Jinja2 `3.1.2 → 3.1.4`（CVE-2024-22195）、certifi `2023.7.22 → 2024.8.30`（过期 CA）。
+
 ## [1.0.1] - 2026-11-23
 
 ### Added

@@ -1417,6 +1417,19 @@
         };
 
         let isLoading = false;
+        /**
+         * HTML 转义：把不可信数据（容器名/label/镜像名/协议，来自 Docker API）安全插入 innerHTML，防 Stored XSS。
+         */
+        function esc(v) {
+            if (v === null || v === undefined) return '';
+            return String(v)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         let portsData = [];
         let hiddenPorts = []; // 存储隐藏端口号的数组
         let currentFilter = 'all';
@@ -1982,7 +1995,7 @@
                     bgColor = '#fee2e2';
                 }
                 
-                return `<span style="font-size: 0.6rem; color: ${color}; background: ${bgColor}; padding: 0.1rem 0.3rem; border-radius: 3px; margin-right: 0.2rem;">${upperProtocol}</span>`;
+                return `<span style="font-size: 0.6rem; color: ${color}; background: ${bgColor}; padding: 0.1rem 0.3rem; border-radius: 3px; margin-right: 0.2rem;">${esc(upperProtocol)}</span>`;
             }).join('');
         }
 
@@ -2071,8 +2084,8 @@
                         <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
                             ${portDisplayHtml}
                             <div class="tooltip">
-                                <div class="service-name">${displayName}</div>
-                                ${fullName.length > 15 ? `<span class="tooltiptext">${fullName}</span>` : ''}
+                                <div class="service-name">${esc(displayName)}</div>
+                                ${fullName.length > 15 ? `<span class="tooltiptext">${esc(fullName)}</span>` : ''}
                             </div>
                             ${card.protocol ? `<div style="margin-top: 0.2rem;">${renderProtocolBadges(card.protocol)}</div>` : ''}
                         </div>
@@ -2111,8 +2124,8 @@
                              <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
                                  <span>${card.source === 'docker' ? '🐳' : '⚙️'}</span>
                                  <div class="tooltip" style="flex: 1; min-width: 0;">
-                                     <div class="process-name">${displayName}</div>
-                                     ${fullName.length > 20 ? `<span class="tooltiptext">${fullName}</span>` : ''}
+                                     <div class="process-name">${esc(displayName)}</div>
+                                     ${fullName.length > 20 ? `<span class="tooltiptext">${esc(fullName)}</span>` : ''}
                                  </div>
                              </div>
                              <div style="display: flex; gap: 0.5rem; align-items: center; height: 24px;">
@@ -2249,8 +2262,9 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    displayPorts(result.data);
-                    updateStats(result.data);
+                    portsData = result.data;
+                    displayPorts(filterPorts(portsData));
+                    updateStats(portsData);
                     
                     // 显示成功提示
                     refreshBtn.textContent = '✅ 刷新成功';

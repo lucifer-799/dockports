@@ -41,8 +41,19 @@ RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r re
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制应用代码
-COPY . .
+# 创建非 root 运行用户（uid 1000），并把应用目录交给它
+RUN useradd -m -u 1000 -s /usr/sbin/nologin app \
+    && mkdir -p /app/config \
+    && chown -R app:app /app
+
+# 复制应用代码（属主交给 app，避免运行期无写权限）
+COPY --chown=app:app . .
+
+# 以非 root 用户运行（最小权限）。
+# 注意：读取 /var/run/docker.sock 需要容器用户在该 socket 的属主组内。
+# 部署时用 compose 的 group_add / docker run --group-add 指定宿主机 socket 的 gid：
+#   group_add: ["<docker-sock-gid>"]     # 宿主上执行: stat -c '%g' /var/run/docker.sock
+USER app
 
 # 设置默认端口环境变量
 ENV DOCKPORTS_PORT=7577
