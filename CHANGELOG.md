@@ -5,6 +5,30 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.5] - 2026-11-23
+
+### Added
+- **明暗主题切换**（`templates/index.html`、`templates/login.html`）：
+  - 三种模式：**明亮 / 暗夜 / 跟随系统**，单个按钮循环切换（light → dark → auto → light）；
+    按钮图标随模式切换（太阳 / 月亮 / 半圆），并带 `title` 与 `aria-label` 说明当前模式。
+  - **状态持久化**：`localStorage` 键 `dockports-theme`，默认 `auto`；隐私模式下读写失败会静默回退。
+  - **跟随系统实时生效**：`auto` 模式下监听 `matchMedia('(prefers-color-scheme: dark)')` 的 `change`
+    事件，系统切换深浅色时页面即时跟随。
+  - **实现方式**：CSS 自定义属性（`--dp-bg` / `--dp-text` / `--dp-card-bg` / `--dp-border` /
+    `--dp-input-bg` / `--dp-shadow` / `--dp-accent` 等）定义明亮与暗夜两套取值，通过
+    `body[data-theme="light|dark"]` 切换；`auto` 用 `@media (prefers-color-scheme: dark)` 映射到暗夜取值。
+    仅新增变量定义与覆盖规则，**不改变原有布局**。
+  - **按钮位置**：右下角固定容器 `.dp-footer-dock` 内，与 GitHub 图标**并排**（间距 8px），
+    两个页面都生效（登录页切换主题后登录进去仍保持）。
+- 说明：本版仅前端样式与交互，**未改动 `app.py`**（1.0.4 的 `esc` / `RLock` 等安全修复原样保留）。
+
+### Known issues（沿用上一版，未处理）
+- 卡片按钮 inline `onclick` 与 `addEventListener` 双触发（需统一改事件委托）。
+- `Dockerfile` 的 `HEALTHCHECK` 只读运行时 `DOCKPORTS_PORT`，`--port` 覆盖时探不到。
+- `app.py` 端口空隙（gap）生成在尾部区间的边界处理。
+- 深色主题采用「变量 + 覆盖」方式落地，个别历史硬编码颜色（如部分 badge 背景）
+  在暗夜下可能仍有轻微不协调，后续可逐步收敛到变量。
+
 ## [1.0.4] - 2026-11-23
 
 ### Security
