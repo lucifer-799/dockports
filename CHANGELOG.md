@@ -5,6 +5,15 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.13] - 2026-11-24
+
+### Fixed
+- **缓存锁重建竞态（ocr 复审唯一 high）**：`PortMonitor.__init__` 原先每次都 `self.cache_lock = RLock()`，而 `/api/refresh` 会再次调用 `__init__()`——并发 Flask 请求可能各持不同锁保护同一实例。改为仅首次创建锁（`if not hasattr(...)` 才赋值），锁对象终身不变；`/api/refresh` 后所有请求仍用同一把 `cache_lock`。
+- **隐藏 UDP 端口过滤（1.0.12 语义回归，复审 medium）**：1.0.12 给隐藏端口虚拟卡片加协议过滤时只允许 TCP/all，导致 UDP 视图下隐藏端口消失。现改为 TCP/UDP/all 视图均可见，虚拟卡片协议随当前视图标记（UDP 视图标 UDP）。
+
+### Notes
+- 改动仅 `app.py` / `templates/index.html` / `templates/login.html` / 版本号。
+
 ## [1.0.12] - 2026-11-24
 
 ### Fixed（ocr 全量审查 5 个 high）

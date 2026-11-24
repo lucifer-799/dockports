@@ -369,7 +369,10 @@ class PortMonitor:
     def __init__(self):
         """初始化Docker客户端"""
         # host-network 容器缓存的并发读写锁（ocr high：避免并发请求读到半填充缓存）
-        self.cache_lock = threading.RLock()
+        # /api/refresh 会再次调用本 __init__；必须保留已有锁，否则并发请求各持不同锁
+        # 保护同一实例（ocr 复审 high）。锁对象一经创建终身不变。
+        if not hasattr(self, 'cache_lock') or self.cache_lock is None:
+            self.cache_lock = threading.RLock()
         try:
             self.docker_client = docker.from_env()
             logger.info("Docker客户端连接成功")

@@ -1509,7 +1509,7 @@
                     </a>
                     <a class="version-link" href="https://github.com/lucifer-799/dockports/releases"
                        target="_blank" rel="noopener" title="查看 Release" aria-label="查看版本发布页">
-                        <span class="version-text">v1.0.12</span>
+                        <span class="version-text">v1.0.13</span>
                     </a>
                 </div>
                 <!-- 明暗主题切换（单独一行） -->
@@ -2006,15 +2006,18 @@
                 const virtualPorts = [];
                 hiddenPorts.forEach(port => {
                     // 与其它卡片一致的过滤：锁定范围 + 当前协议（ocr high）
+                    // 隐藏端口是「不展示」标记，不代表只属于 TCP：TCP/UDP/all 视图都应可见，
+                    // 否则 UDP 视图下的隐藏端口会消失（1.0.13 语义回归，复审 medium）。
+                    const proto = String(currentProtocol).toUpperCase();
                     const inScope = (!isPortRangeLocked || (port >= lockedStartPort && port <= lockedEndPort))
-                        && (currentProtocol === 'all' || String(currentProtocol).toUpperCase() === 'TCP');
+                        && (proto === 'ALL' || proto === 'TCP' || proto === 'UDP');
                     if (!existingHiddenPorts.has(port) && inScope) {
                         virtualPorts.push({
                             type: 'used',
                             port: port,
                             service_name: '已隐藏端口',
                             source: 'system',
-                            protocol: 'TCP',
+                            protocol: proto === 'UDP' ? 'UDP' : 'TCP',
                             container: null,
                             is_host_network: false,
                             is_virtual: true // 标记为虚拟端口
