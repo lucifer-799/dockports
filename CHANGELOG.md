@@ -11,9 +11,12 @@
 - **前端图标/分组布局调整**（`templates/index.html`）：
   - 「📊 端口分类检索」标题与其下的分类图标列表（全部 / 宿主机 / 容器 / 未使用 / 已隐藏）
     用一个**方形边框容器**（`.sidebar-group--catalog`）整体框起，视觉上成为一组。
-  - 工具图标——**主题切换按钮**（太阳/月亮/半圆，即用户所说「敏感图标」）与 **GitHub 图标**——
-    从右下角浮动（`position: fixed`）**移入左侧边栏「端口范围锁定」按钮下方**，
-    并放入一个**小方形边框容器**（`.sidebar-group--icons`）中成组展示。
+  - 工具区——**GitHub 图标 + 版本号** 与 **明暗主题切换按钮**——从右下角浮动（`position: fixed`）
+    **移入左侧边栏「端口范围锁定」按钮下方**，放入一个**小方形边框容器**（`.sidebar-group--icons`），
+    内部纵向两行：
+    - 第一行 `version-container`：GitHub 图标（自绘 `static/github-light.svg`，24×24；
+      暗色主题下用 `filter: invert(1)` 反色保证可见）+ 版本号文本 `v1.0.7`，整行即 GitHub 仓库链接；
+    - 第二行 `theme-row`：明暗主题切换按钮（太阳 / 月亮 / 半圆），单独一行。
   - 方框样式统一使用主题变量 `--dp-card-border` / `--dp-surface`，明暗主题下自动适配。
   - 仅调整 DOM 位置与 CSS，**未改动任何功能逻辑**：主题切换、GitHub 链接、端口范围锁定、
     `esc()` 转义与后端 `CONFIG_IO_LOCK` 等安全代码全部原样。
