@@ -5,6 +5,30 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.10] - 2026-11-23
+
+### Fixed
+- **图标与版本号高度对齐（根因修复）**：此前 1.0.9 已将图标缩到 16px、版本号 15px、`align-items:center`，
+  但用户肉眼仍明显不齐。逐项排查后确认根因有三：
+  1. **单位错配**：图标固定 16px 与文字 15px 永远差 1px，且不同字体下字高随字体变化，固定 px 无法自适应；
+  2. **行盒基线间隙**：`<img>` 虽已是 `display:block`，但其外层 `.github-icon` 原为 `inline-flex; line-height:1`，
+     仍引入行盒高度，使图标在容器内相对文字下沉/上浮；
+  3. **em 基准缺失**：`login.html` 的 `.icon` 用 `1em` 时，父 `.version-container` 并未设定 `font-size`，
+     1em 实际取 body 的 16px——与 index 页不同，两个页面图标大小不一致。
+  修法：`version-container` 显式 `font-size:15px; line-height:1`；GitHub 图标改
+  `width:1em; height:1em; display:block`（computed = 15px，与字号天然一致）；
+  `.github-icon` 容器改 `display:block; line-height:0`（彻底消除行盒基线留白）；
+  `<img>` 的 width/height 属性同步设为 15（无 CSS 时也一致）；
+  三个主题按钮 SVG 由 18px 统一到 **15px**（与图标同尺寸，避免大小混搭）。
+  两模板（index.html / login.html）同样处理，两个页面表现一致。
+
+### Known
+- 本环境无浏览器内核（playwright 已装但 chromium 未安装），**无法做可视化截图验证**；
+  对齐依据为上述 CSS 选择器命中、优先级（仅一条规则设置图标尺寸，无覆盖）、computed 尺寸推算（1em=15px）。
+
+其它保持不变：两个独立链接、去下划线、侧栏 gap:1rem、三主题按钮 + auto 跟随、
+左侧布局、app.py 安全代码（`git diff app.py` 为空）。
+
 ## [1.0.9] - 2026-11-23
 
 ### Fixed

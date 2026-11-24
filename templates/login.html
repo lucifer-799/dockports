@@ -151,14 +151,15 @@
 
         /* ===== 1.0.8 工具区：两独立链接 + 三主题按钮 ===== */
         .login-tools { display: flex; flex-direction: column; align-items: center; gap: .45rem; }
-        .version-container { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; text-decoration: none; }
+        .version-container { font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; gap: .45rem; text-decoration: none; }
         .version-container a, .version-container a:hover, .version-container a:focus,
         .version-container a:visited, .version-container a:active {
             text-decoration: none !important; color: var(--dp-muted); cursor: pointer;
         }
         .version-container a:hover { color: var(--dp-text); }
-        .version-container .icon { width: 16px; height: 16px; display: block; }
-        .version-container .version-text { font-size: 15px; font-weight: 600; line-height: 18px; }
+        .version-container .icon { width: 1em; height: 1em; display: block; }
+        .version-container .github-icon { display: block; line-height: 0; }
+        .version-container .version-text { font-size: 15px; font-weight: 600; line-height: 1; }
         body[data-theme="dark"] .version-container .icon { filter: invert(1); }
         .theme-row { display: inline-flex; align-items: center; gap: .3rem; }
         .theme-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--dp-border); border-radius: 6px; background: transparent; color: var(--dp-muted); cursor: pointer; opacity: .7; }
@@ -183,17 +184,17 @@
 <div class="version-container">
                     <a class="github-link" href="https://github.com/lucifer-799/dockports"
                        target="_blank" rel="noopener" title="GitHub 仓库" aria-label="GitHub 仓库">
-                        <span class="github-icon"><img src="/static/github-light.svg" class="icon" width="16" height="16" alt="GitHub" loading="lazy"></span>
+                        <span class="github-icon"><img src="/static/github-light.svg" class="icon" width="15" height="15" alt="GitHub" loading="lazy"></span>
                     </a>
                     <a class="version-link" href="https://github.com/lucifer-799/dockports/releases"
                        target="_blank" rel="noopener" title="查看 Release" aria-label="查看版本发布页">
-                        <span class="version-text">v1.0.9</span>
+                        <span class="version-text">v1.0.10</span>
                     </a>
                 </div>
 <div class="theme-row">
-                    <button type="button" class="theme-btn" data-mode="auto" title="跟随系统" aria-label="主题：跟随系统"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"></path></svg></button>
-                    <button type="button" class="theme-btn" data-mode="light" title="明亮" aria-label="主题：明亮"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"></path></svg></button>
-                    <button type="button" class="theme-btn" data-mode="dark" title="暗夜" aria-label="主题：暗夜"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
+                    <button type="button" class="theme-btn" data-mode="auto" title="跟随系统" aria-label="主题：跟随系统"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"></path></svg></button>
+                    <button type="button" class="theme-btn" data-mode="light" title="明亮" aria-label="主题：明亮"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"></path></svg></button>
+                    <button type="button" class="theme-btn" data-mode="dark" title="暗夜" aria-label="主题：暗夜"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
                 </div>
             </div>
         </div>
