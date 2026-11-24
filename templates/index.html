@@ -1262,18 +1262,30 @@
             padding: 0.5rem 0.45rem;
         }
         /* GitHub 图标 + 版本号（参考样式 version-container） */
+        /* 整行（GitHub 图标 + 版本号）都是可点击链接，指向仓库主页 */
         .version-container {
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
             text-decoration: none;
+            cursor: pointer;
             color: var(--dp-text-muted);
             opacity: .85;
-            transition: opacity .15s ease, color .15s ease;
+            border-radius: 6px;
+            padding: 1px 3px;
+            transition: opacity .15s ease, color .15s ease, background-color .15s ease;
         }
-        .version-container:hover {
+        .version-container:hover,
+        .version-container:focus-visible {
             opacity: 1;
             color: var(--dp-text-strong);
+            background: var(--dp-surface);
+        }
+        /* 悬停时给版本号加下划线，强化"可点击"的视觉反馈 */
+        .version-container:hover .version-text,
+        .version-container:focus-visible .version-text {
+            text-decoration: underline;
+            text-underline-offset: 2px;
         }
         .version-container .github-icon {
             display: inline-flex;
