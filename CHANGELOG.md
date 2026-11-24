@@ -5,6 +5,20 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.9] - 2026-11-23
+
+### Fixed
+- **GitHub 图标与版本号视觉大小协调**（`templates/index.html`、`templates/login.html`）：
+  1.0.8 把版本号从 0.78rem 放大到 15px 后，GitHub 图标仍为 24px，图标明显大于文字、失衡。
+  本版将 GitHub 图标**从 24px 缩小到 16px**（`<img>` 的 `width`/`height` 属性与 CSS
+  `.version-container .icon` 同步修改），并把版本号 `line-height` 由 24px 调到 18px，
+  与 16px 图标 + 15px 字高协调；`version-container` 保持 `inline-flex; align-items:center`
+  垂直居中。
+- 三个主题按钮的 SVG 已是 18px，与这一行协调，未改动。
+
+其它保持不变：图标→仓库、版本号→releases 两个独立链接、去下划线、侧栏模块间距
+`gap:1rem`、三主题按钮 + auto 跟随、左侧布局位置、app.py 安全代码（`git diff app.py` 为空）。
+
 ## [1.0.8] - 2026-11-23
 
 ### Fixed
