@@ -1261,58 +1261,79 @@
             gap: 0.45rem;
             padding: 0.5rem 0.45rem;
         }
-        /* GitHub 图标 + 版本号（参考样式 version-container） */
-        /* 整行（GitHub 图标 + 版本号）都是可点击链接，指向仓库主页 */
+        /* GitHub 图标 + 版本号：垂直居中、字号加大、全状态无下划线 */
         .version-container {
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            justify-content: center;
+            gap: 0.45rem;
             text-decoration: none;
-            cursor: pointer;
+        }
+        /* 两独立链接：图标->仓库主页；版本号->releases。全状态强制无下划线 */
+        .version-container a,
+        .version-container a:hover,
+        .version-container a:focus,
+        .version-container a:focus-visible,
+        .version-container a:visited,
+        .version-container a:active {
+            text-decoration: none !important;
             color: var(--dp-text-muted);
-            opacity: .85;
-            border-radius: 6px;
-            padding: 1px 3px;
-            transition: opacity .15s ease, color .15s ease, background-color .15s ease;
+            cursor: pointer;
+            transition: color .15s ease;
         }
-        .version-container:hover,
-        .version-container:focus-visible {
-            opacity: 1;
-            color: var(--dp-text-strong);
-            background: var(--dp-surface);
-        }
-        /* 悬停时给版本号加下划线，强化"可点击"的视觉反馈 */
-        .version-container:hover .version-text,
-        .version-container:focus-visible .version-text {
-            text-decoration: underline;
-            text-underline-offset: 2px;
-        }
+        .version-container a:hover,
+        .version-container a:focus-visible { color: var(--dp-text-strong); }
         .version-container .github-icon {
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            line-height: 1;
         }
-        .version-container .github-icon .icon {
-            width: 24px;
-            height: 24px;
-            display: block;
-        }
-        /* 暗色主题下把深色 GitHub 图标反色，保证可见 */
+        .version-container .github-icon .icon { width: 24px; height: 24px; display: block; }
         body[data-theme="dark"] .version-container .icon { filter: invert(1); }
         @media (prefers-color-scheme: dark) {
             body[data-theme="auto"] .version-container .icon { filter: invert(1); }
         }
         .version-container .version-text {
-            font-size: 0.78rem;
-            letter-spacing: .2px;
-        }
-        /* 明暗主题切换：单独一行 */
-        .theme-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 24px;
+            text-decoration: none !important;
         }
 
+        /* 明暗主题切换：三个独立按钮一排，当前激活态高亮 */
+        .theme-row {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+        }
+        .theme-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border: 1px solid var(--dp-card-border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--dp-text-muted);
+            cursor: pointer;
+            opacity: .7;
+            transition: opacity .15s ease, color .15s ease, border-color .15s ease;
+        }
+        .theme-btn:hover, .theme-btn:focus-visible {
+            opacity: 1;
+            color: var(--dp-text-strong);
+            border-color: var(--dp-accent);
+        }
+        .theme-btn.active {
+            opacity: 1;
+            color: var(--dp-accent);
+            border-color: var(--dp-accent);
+            background: var(--dp-surface);
+        }
         /* ===== 主题变量：light / dark / auto ===== */
         body {
             --dp-bg: #f5f7fa;
@@ -1479,30 +1500,21 @@
             <!-- 小方框：工具图标（主题切换 + GitHub） -->
             <div class="sidebar-group sidebar-group--icons">
                 <!-- GitHub 图标 + 版本号（照参考样式：version-container） -->
-                <a class="version-container" href="https://github.com/lucifer-799/dockports"
-                   target="_blank" rel="noopener" title="GitHub 仓库" aria-label="GitHub 仓库">
-                    <span class="github-icon">
-                        <img src="/static/github-light.svg" class="icon" width="24" height="24" alt="GitHub" loading="lazy">
-                    </span>
-                    <span class="version-text">v1.0.7</span>
-                </a>
+                <div class="version-container">
+                    <a class="github-link" href="https://github.com/lucifer-799/dockports"
+                       target="_blank" rel="noopener" title="GitHub 仓库" aria-label="GitHub 仓库">
+                        <span class="github-icon"><img src="/static/github-light.svg" class="icon" width="24" height="24" alt="GitHub" loading="lazy"></span>
+                    </a>
+                    <a class="version-link" href="https://github.com/lucifer-799/dockports/releases"
+                       target="_blank" rel="noopener" title="查看 Release" aria-label="查看版本发布页">
+                        <span class="version-text">v1.0.8</span>
+                    </a>
+                </div>
                 <!-- 明暗主题切换（单独一行） -->
                 <div class="theme-row">
-                    <a class="theme-toggle" id="themeToggle" href="javascript:void(0)" role="button"
-   data-mode="auto" title="切换主题" aria-label="切换主题"
-   onclick="window.__dpTheme.toggle();return false;">
-  <svg class="theme-icon theme-icon--light" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="4"></circle>
-    <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"></path>
-  </svg>
-  <svg class="theme-icon theme-icon--dark" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
-  </svg>
-  <svg class="theme-icon theme-icon--auto" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-    <circle cx="12" cy="12" r="9"></circle>
-    <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"></path>
-  </svg>
-</a>
+                    <button type="button" class="theme-btn" data-mode="auto" title="跟随系统" aria-label="主题：跟随系统"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"></path></svg></button>
+                    <button type="button" class="theme-btn" data-mode="light" title="明亮" aria-label="主题：明亮"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"></path></svg></button>
+                    <button type="button" class="theme-btn" data-mode="dark" title="暗夜" aria-label="主题：暗夜"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
                 </div>
             </div>
         </div>
@@ -3085,53 +3097,60 @@
     <script>
 
             /* ===== 主题切换（light / dark / auto）===== */
+            /* ===== 主题切换（三按钮：auto / light / dark）===== */
             (function () {
                 var THEME_KEY = 'dockports-theme';
-                var MODES = ['light', 'dark', 'auto'];
                 var LABELS = { light: '明亮', dark: '暗夜', auto: '跟随系统' };
+                var VALID = ['light', 'dark', 'auto'];
 
                 function readSaved() {
                     try {
                         var v = localStorage.getItem(THEME_KEY);
-                        return MODES.indexOf(v) >= 0 ? v : 'auto';
+                        return VALID.indexOf(v) >= 0 ? v : 'auto';
                     } catch (e) { return 'auto'; }
                 }
 
                 function apply(mode) {
                     document.body.setAttribute('data-theme', mode);
-                    var btn = document.getElementById('themeToggle');
-                    if (btn) {
-                        var label = LABELS[mode] + '（点击切换）';
-                        btn.setAttribute('title', label);
-                        btn.setAttribute('aria-label', '切换主题，当前：' + LABELS[mode]);
-                        // 图标：light=太阳 / dark=月亮 / auto=半圆
-                        btn.setAttribute('data-mode', mode);
-                    }
+                    document.querySelectorAll('.theme-btn').forEach(function (btn) {
+                        var on = btn.getAttribute('data-mode') === mode;
+                        btn.classList.toggle('active', on);
+                        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    });
                 }
 
                 function save(mode) {
-                    try { localStorage.setItem(THEME_KEY, mode); } catch (e) { /* 忽略隐私模式 */ }
+                    try { localStorage.setItem(THEME_KEY, mode); } catch (e) { /* 隐私模式忽略 */ }
                 }
 
                 window.__dpTheme = {
                     current: 'auto',
+                    set: function (mode) {
+                        if (VALID.indexOf(mode) < 0) return;
+                        this.current = mode;
+                        save(mode);
+                        apply(mode);
+                    },
                     init: function () {
+                        var self = this;
                         this.current = readSaved();
                         apply(this.current);
-                        // 自动模式：跟随系统主题实时变化
+
+                        document.querySelectorAll('.theme-btn').forEach(function (btn) {
+                            btn.addEventListener('click', function () {
+                                self.set(btn.getAttribute('data-mode'));
+                            });
+                        });
+
+                        // 自动模式：系统主题变化时实时切换（仅 auto 激活时生效）
                         try {
                             var mq = window.matchMedia('(prefers-color-scheme: dark)');
-                            var self = this;
-                            var onChange = function () { if (self.current === 'auto') apply('auto'); };
+                            var onChange = function () {
+                                if (self.current === 'auto') apply('auto');
+                            };
                             if (mq.addEventListener) mq.addEventListener('change', onChange);
                             else if (mq.addListener) mq.addListener(onChange);
                         } catch (e) { /* 老浏览器忽略 */ }
-                    },
-                    toggle: function () {
-                        var i = MODES.indexOf(this.current);
-                        this.current = MODES[(i + 1) % MODES.length];
-                        save(this.current);
-                        apply(this.current);
                     }
                 };
                 window.__dpTheme.init();

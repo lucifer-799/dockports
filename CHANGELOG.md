@@ -5,6 +5,30 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.8] - 2026-11-23
+
+### Fixed
+- **GitHub 图标与版本号对齐 / 放大 / 去下划线**（`templates/index.html`、`templates/login.html`）：
+  - `version-container` 用 `display:inline-flex; align-items:center`，图标（24×24）与版本号垂直居中对齐；
+  - 版本号字号由 `0.78rem` 提升到 **15px / font-weight 600 / line-height 24px**，视觉更清晰；
+  - 版本号与图标的全状态（`hover` / `focus` / `visited` / `active`）**强制 `text-decoration:none !important`**，
+    移除此前的 hover 下划线；反馈改为文字颜色提亮（`--dp-text-strong`）。
+
+### Changed
+- **两个独立链接，点击目标分离**（此前整行一个链接）：
+  - 点 **GitHub 图标** → `https://github.com/lucifer-799/dockports`（仓库主页）
+  - 点 **版本号 `v1.0.8`** → `https://github.com/lucifer-799/dockports/releases`（Release 页）
+  - 各自独立 `<a target="_blank" rel="noopener">`，可点区域清晰。
+- **明暗主题由单按钮循环改为三个独立按钮**（`data-mode=auto|light|dark`，一排紧凑展示）：
+  - 自动 = 半圆 / 明亮 = 太阳 / 暗夜 = 月亮，各带 `title` / `aria-label`；
+  - 当前模式按钮**高亮激活态**（`.theme-btn.active`，用 `--dp-accent` / `--dp-surface`）；
+  - `localStorage['dockports-theme']` 持久化；点击各自 `set(mode)`；
+  - **auto 模式后台跟随浏览器**：`matchMedia('(prefers-color-scheme: dark)')` 监听 `change`，
+    仅当 `current === 'auto'` 时实时应用系统主题（原逻辑保留并改为按激活态判断）。
+  - 登录页 `login.html` 同样具备三按钮 + 两独立链接（右下角工具区）。
+- 未改变功能逻辑与安全代码：`git diff app.py` 为空（`esc()` / `CONFIG_IO_LOCK` 原样）；
+  左侧「端口范围锁定」下方小方框、「端口分类检索」大方框与主题 CSS 变量均保持不变。
+
 ## [1.0.7] - 2026-11-23
 
 ### Changed
