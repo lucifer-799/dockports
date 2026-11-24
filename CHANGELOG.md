@@ -5,6 +5,22 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.12] - 2026-11-24
+
+### Fixed（ocr 全量审查 5 个 high）
+- `templates/index.html:2119` 端口范围起始 0 被 truthiness 丢弃：改为 `!= null` 显式判断（loadPorts/performSearch 两处），端口 0 现为合法起始值。
+- `templates/index.html:2006` 隐藏标签虚拟卡片绕过协议/范围过滤、一律标 TCP：新增与常规卡片一致的 `inScope` 判定（锁定范围 + 当前协议），不再泄漏视图外端口。
+- `templates/index.html:2210` **`formatPortRange` 原始 API 值直插 innerHTML（XSS 残留）**：先用 `toInt` 校验为 0-65535 整数（非法返回空串），再经 `esc()` 转义后拼接；同文件全量排查 innerHTML 模板插值，编辑/批量编辑弹窗的端口值也补 `esc()`。参照 1.0.2 对 `displayName`/`fullName` 的修复方式。
+- `app.py:1031` 端口边界 clamp 顺序错误（先 clamp 后 swap 会重新产生越界边界）：改为先交换顺序、再对两端分别 clamp。
+- `app.py:593` host-network 容器缓存共享可变状态无锁：新增 `PortMonitor.cache_lock = threading.RLock()`，原方法重命名为 `_..._unlocked`，新增带锁包装方法返回缓存副本 `dict(result)`，避免并发请求读到半填充缓存或迭代中字典尺寸变化。
+
+### Fixed（顺手 medium）
+- 登录退避 `2 ** n` 指数封顶（≤10），避免长期重试触发超大整数幂运算。
+- 5 处 `isinstance(port, int)` 改为 `type(port) is not int`，拒绝 bool（`true` 曾被存成端口 1）。
+
+### Notes
+- 本轮纯安全修复，不含功能变更；改动仅 `app.py` / `templates/index.html` / `templates/login.html` / 版本号。
+
 ## [1.0.11] - 2026-11-23
 
 ### Fixed

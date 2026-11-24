@@ -1,0 +1,19 @@
+fix(1.0.12): 修复 ocr 全量审查的 5 个 high（含 XSS 残留）+ 顺手 medium
+
+来源：main 3672c75 全量 ocr scan（10 文件 / 25 条：high 5 / medium 11 / low 9）。
+本轮只改安全项，未改功能；critical 保持 0。
+
+5 个 high：
+1. index.html 端口范围起始 0 被 truthiness 丢弃 -> != null 显式判断（2 处）
+2. index.html 隐藏标签虚拟卡片绕过协议/范围过滤 -> 加 inScope 判定（范围+协议）
+3. index.html formatPortRange 原始 API 值直插 innerHTML（XSS）-> toInt 校验 + esc() 转义；
+   同文件全量排查 innerHTML 插值，编辑/批量编辑弹窗端口值补 esc()
+4. app.py 端口边界 clamp 顺序错误 -> 先 swap 再对两端 clamp
+5. app.py host-network 容器缓存共享可变状态无锁 -> cache_lock(RLock) + 带锁包装返回副本
+
+顺手 medium：登录退避 2**n 指数封顶（≤10）；5 处 isinstance(port,int) 改
+type(port) is not int 拒绝 bool（true 曾被存为端口 1）。
+
+验证：容器环境 import app OK；Flask GET / 200 且含 v1.0.12；Jinja 两模板
+open/end 配对；compose.yaml + build.yml YAML 校验 OK；git diff 仅 4 个相关文件。
+未构建/未部署/未推 GitHub。

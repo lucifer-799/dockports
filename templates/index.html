@@ -1509,7 +1509,7 @@
                     </a>
                     <a class="version-link" href="https://github.com/lucifer-799/dockports/releases"
                        target="_blank" rel="noopener" title="查看 Release" aria-label="查看版本发布页">
-                        <span class="version-text">v1.0.11</span>
+                        <span class="version-text">v1.0.12</span>
                     </a>
                 </div>
                 <!-- 明暗主题切换（单独一行） -->
@@ -2005,7 +2005,10 @@
                 // 为不在原始数据中的隐藏端口创建虚拟卡片
                 const virtualPorts = [];
                 hiddenPorts.forEach(port => {
-                    if (!existingHiddenPorts.has(port)) {
+                    // 与其它卡片一致的过滤：锁定范围 + 当前协议（ocr high）
+                    const inScope = (!isPortRangeLocked || (port >= lockedStartPort && port <= lockedEndPort))
+                        && (currentProtocol === 'all' || String(currentProtocol).toUpperCase() === 'TCP');
+                    if (!existingHiddenPorts.has(port) && inScope) {
                         virtualPorts.push({
                             type: 'used',
                             port: port,
@@ -2116,9 +2119,10 @@
                 }
                 
                 // 添加端口范围参数
-                if (isPortRangeLocked && lockedStartPort && lockedEndPort) {
-                    params.append('start_port', lockedStartPort.toString());
-                    params.append('end_port', lockedEndPort.toString());
+                // 端口 0 是合法起始值，不能用 truthiness 判断（ocr high）
+                if (isPortRangeLocked && lockedStartPort != null && lockedEndPort != null) {
+                    params.append('start_port', String(lockedStartPort));
+                    params.append('end_port', String(lockedEndPort));
                 }
                 
                 if (params.toString()) {
@@ -2174,9 +2178,10 @@
                 }
                 
                 // 添加端口范围参数
-                if (isPortRangeLocked && lockedStartPort && lockedEndPort) {
-                    params.append('start_port', lockedStartPort.toString());
-                    params.append('end_port', lockedEndPort.toString());
+                // 端口 0 是合法起始值，不能用 truthiness 判断（ocr high）
+                if (isPortRangeLocked && lockedStartPort != null && lockedEndPort != null) {
+                    params.append('start_port', String(lockedStartPort));
+                    params.append('end_port', String(lockedEndPort));
                 }
                 
                 if (params.toString()) {
@@ -2208,10 +2213,12 @@
          * 使用 "起始-结束" 明确区间，避免旧版 "3000:2" 被误读为端口/协议或范围。
          */
         function formatPortRange(startPort, endPort) {
-            if (endPort <= startPort) {
-                return startPort.toString();
-            }
-            return `${startPort}-${endPort}`;
+            // API 值不可信：先整数校验（非法返回空串），再转义后拼 HTML（ocr high / XSS）
+            const start = toInt(startPort, 0, 65535);
+            const end = toInt(endPort, 0, 65535);
+            if (start === null || end === null) return '';
+            if (end <= start) return esc(String(start));
+            return esc(String(start) + '-' + String(end));
         }
 
         /**
@@ -2724,7 +2731,7 @@
             modal.className = 'edit-modal';
             modal.innerHTML = `
                 <div class="edit-modal-content">
-                    <h3>编辑端口 ${port} 的服务配置</h3>
+                    <h3>编辑端口 ${esc(String(port))} 的服务配置</h3>
                     <div style="margin-bottom: 1rem;">
                         <label for="portNameInput" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">服务名称:</label>
                         <input type="text" id="portNameInput" placeholder="请输入服务名称" maxlength="50" style="width: 100%; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px;">
@@ -2819,7 +2826,7 @@
             modal.className = 'edit-modal';
             modal.innerHTML = `
                 <div class="edit-modal-content">
-                    <h3>批量编辑端口 ${startPort}-${endPort} 的服务名称</h3>
+                    <h3>批量编辑端口 ${esc(String(startPort))}-${esc(String(endPort))} 的服务名称</h3>
                     <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">此操作将为范围内的所有端口设置相同的服务名称</p>
                     <input type="text" id="portRangeNameInput" placeholder="请输入服务名称" maxlength="50">
                     <div class="edit-modal-buttons">

@@ -96,7 +96,9 @@ LOGIN_FAILURES_MAX_IPS = 4096  # 字典容量上限，超限先清理最旧的�
 
 
 def _backoff_delay(failures):
-    return min(LOGIN_BASE_DELAY * (2 ** (failures - LOGIN_MAX_FAILURES)), LOGIN_MAX_DELAY)
+    # 指数封顶，避免长期重试触发超大整数幂运算（ocr medium）
+    exponent = min(max(0, failures - LOGIN_MAX_FAILURES), 10)
+    return min(LOGIN_BASE_DELAY * (2 ** exponent), LOGIN_MAX_DELAY)
 
 
 def _prune_login_failures_locked(now):
@@ -366,6 +368,8 @@ class PortMonitor:
     
     def __init__(self):
         """初始化Docker客户端"""
+        # host-network 容器缓存的并发读写锁（ocr high：避免并发请求读到半填充缓存）
+        self.cache_lock = threading.RLock()
         try:
             self.docker_client = docker.from_env()
             logger.info("Docker客户端连接成功")
@@ -582,7 +586,7 @@ class PortMonitor:
         # 如果都没有，返回未知
         return '未知服务'
     
-    def get_host_network_containers_cached(self):
+    def _get_host_network_containers_cached_unlocked(self):
         """获取host网络容器信息（带缓存，增强版本）"""
         import time
         import re
@@ -721,6 +725,18 @@ class PortMonitor:
         self.cache_timestamp = current_time
         return self.container_cache
     
+    def get_host_network_containers_cached(self):
+        """带并发保护的缓存读取：返回副本，避免调用方改动共享缓存。
+
+        ocr high 修复：原实现把共享 dict 按引用返回且无锁，Flask 多线程下
+        并发请求可观察到半填充缓存，或在 get_host_ports 迭代时
+        'dictionary changed size during iteration'。
+        """
+        with self.cache_lock:
+            result = self._get_host_network_containers_cached_unlocked()
+            # 返回浅拷贝：顶层 dict 不再与外部共享；内部 set 由调用方只读使用
+            return dict(result) if isinstance(result, dict) else result
+
     def get_port_analysis(self, start_port=1, end_port=65535, protocol_filter=None):
         """分析端口使用情况并生成可视化数据"""
         docker_ports = self.get_docker_ports()
@@ -1028,13 +1044,12 @@ def api_ports():
             start_port = int(start_port)
             end_port = int(end_port)
             
-            # 确保端口范围有效
-            if start_port < 1:
-                start_port = 1
-            if end_port > 65535:
-                end_port = 65535
+            # 确保端口范围有效：先交换顺序，再对两端分别 clamp
+            # （原实现先 clamp 再 swap，越界值交换后会重新产生非法边界，如 start=70000/end=65535）
             if start_port > end_port:
                 start_port, end_port = end_port, start_port
+            start_port = max(1, min(start_port, 65535))
+            end_port = max(1, min(end_port, 65535))
                 
         except ValueError:
             # 如果参数无效，使用默认范围
@@ -1279,7 +1294,7 @@ def api_save_config():
                 else:
                     return jsonify({'error': f'配置项 "{name}" 格式无效，支持格式：端口号、"端口号:协议" 或 {{port: 端口号, protocol: 协议}}'}), 400
                 
-                if not isinstance(port, int) or port < 1 or port > 65535:
+                if type(port) is not int or port < 1 or port > 65535:  # type() 排除 bool（True 曾是端口 1）
                     return jsonify({'error': f'端口号 "{port}" 无效，必须是1-65535之间的整数'}), 400
             
             # 直接保存原始格式的配置到文件
@@ -1343,7 +1358,7 @@ def api_hide_port():
             return jsonify({'error': '缺少端口参数'}), 400
         
         port = data['port']
-        if not isinstance(port, int) or port < 1 or port > 65535:
+        if type(port) is not int or port < 1 or port > 65535:  # type() 排除 bool（True 曾是端口 1）
             return jsonify({'error': '端口号必须在1-65535之间'}), 400
         
         # 整段「读-改-写」持锁：避免并发 hide 请求互相覆盖（丢隐藏记录）
@@ -1382,7 +1397,7 @@ def api_unhide_port():
             return jsonify({'error': '缺少端口参数'}), 400
         
         port = data['port']
-        if not isinstance(port, int) or port < 1 or port > 65535:
+        if type(port) is not int or port < 1 or port > 65535:  # type() 排除 bool（True 曾是端口 1）
             return jsonify({'error': '端口号必须在1-65535之间'}), 400
         
         # 整段读-改-写持锁
@@ -1425,7 +1440,7 @@ def api_hide_ports_batch():
         
         # 验证所有端口号
         for port in ports:
-            if not isinstance(port, int) or port < 1 or port > 65535:
+            if type(port) is not int or port < 1 or port > 65535:  # type() 排除 bool（True 曾是端口 1）
                 return jsonify({'error': f'端口号 {port} 无效，必须在1-65535之间'}), 400
         
         # 整段读-改-写持锁（批量隐藏与单条隐藏共享同一把锁，避免交错覆盖）
@@ -1470,7 +1485,7 @@ def api_unhide_ports_batch():
         
         # 验证所有端口号
         for port in ports:
-            if not isinstance(port, int) or port < 1 or port > 65535:
+            if type(port) is not int or port < 1 or port > 65535:  # type() 排除 bool（True 曾是端口 1）
                 return jsonify({'error': f'端口号 {port} 无效，必须在1-65535之间'}), 400
         
         # 整段读-改-写持锁
