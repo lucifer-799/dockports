@@ -26,8 +26,13 @@
   - **auto 模式后台跟随浏览器**：`matchMedia('(prefers-color-scheme: dark)')` 监听 `change`，
     仅当 `current === 'auto'` 时实时应用系统主题（原逻辑保留并改为按激活态判断）。
   - 登录页 `login.html` 同样具备三按钮 + 两独立链接（右下角工具区）。
+- **侧栏模块间距**：此前「端口分类检索」大方框、「端口范围锁定」、「GitHub/主题小方框」三块
+  互相紧贴（`port-range-lock` 靠 `margin-top: 2rem`、其它靠 `margin-bottom: 0.8rem`，间距不一致）。
+  改为侧栏统一 `display:flex; flex-direction:column; gap:1rem`（16px），移除各模块自带 margin，
+  三块之间间距一致、透气；`port-range-lock` 的浅色与边框也收敛到 `--dp-surface` / `--dp-card-border`
+  变量（跟随明暗主题）。窄屏下侧栏 `width:100%`，flex 列布局不溢出。
 - 未改变功能逻辑与安全代码：`git diff app.py` 为空（`esc()` / `CONFIG_IO_LOCK` 原样）；
-  左侧「端口范围锁定」下方小方框、「端口分类检索」大方框与主题 CSS 变量均保持不变。
+  主题 CSS 变量与其余功能保持不变。
 
 ## [1.0.7] - 2026-11-23
 

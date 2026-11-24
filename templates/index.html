@@ -112,12 +112,16 @@
 
         .sidebar {
             width: 250px;
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--dp-card-bg, rgba(255, 255, 255, 0.95));
             border-radius: 12px;
             padding: 1.5rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             height: fit-content;
             backdrop-filter: blur(10px);
+            /* 三模块（分类检索大方框 / 端口范围锁定 / 工具图标小方框）统一垂直间距 */
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
 
         .sidebar h3 {
@@ -165,11 +169,10 @@
 
         /* 端口范围锁定样式 */
         .port-range-lock {
-            margin-top: 2rem;
             padding: 1rem;
-            background: #f8f9fa;
+            background: var(--dp-surface, #f8f9fa);
             border-radius: 8px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--dp-card-border, #e2e8f0);
         }
 
         .port-range-lock h4 {
@@ -1248,7 +1251,6 @@
             border-radius: 10px;
             background: var(--dp-surface);
             padding: 0.7rem 0.8rem;
-            margin-bottom: 0.8rem;
         }
         .sidebar-group--catalog h3 {
             margin: 0 0 0.5rem;
