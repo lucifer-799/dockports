@@ -5,6 +5,22 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.11] - 2026-11-23
+
+### Fixed
+- **工具小方框内两行的间距与高度协调**（`templates/index.html`、`templates/login.html`）：
+  1.0.10 实机确认 GitHub 图标与版本号已对齐，但用户指出两个问题，本版一并修复：
+  1. **行间距**：`.sidebar-group--icons`（login 为 `.login-tools`）是纵向 flex，原 `gap: 0.45rem`（约 7px）
+     使 `version-container` 行与 `theme-row` 行贴在一起；改为 **`gap: 0.75rem`（12px）**，
+     两行之间留出呼吸空间（小框内边距也由 `0.5rem 0.45rem` 微调到 `0.6rem 0.5rem`）。
+  2. **按钮高度对齐**：三个主题按钮框原为 **30px**，比上方 version 行（15px 内容）高一倍，视觉突兀；
+     收至 **24px**（内部 SVG 仍 15px、`inline-flex + align-items:center` 居中，点击区域仍够用），
+     与版本号那一行般配。三个按钮统一 `width/height:24px`、`line-height` 由 flex 居中保证一致。
+  3. 两行保持 `align-items:center`、小框 `flex-direction:column` 水平居中，不会出现一行居中一行靠左。
+
+其它保持不变：图标与版本号 1em/15px 对齐、两个独立链接（仓库 / releases）、去下划线、
+三主题按钮 + auto 跟随、侧栏 `gap:1rem`、app.py 安全代码（`git diff app.py` 为空）。
+
 ## [1.0.10] - 2026-11-23
 
 ### Fixed
