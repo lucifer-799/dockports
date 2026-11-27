@@ -5,6 +5,21 @@
 本项目 fork 自 `coracoo/DockPorts` v0.2.1（commit `8f7ff5f`，上游已停更，MIT）。
 本 fork 维护者：lucifer-799。以下按时间倒序记录变更。
 
+## [1.0.15] - 2026-11-26
+
+### Fixed（Docker SDK 连接 / 依赖根因）
+- **修复所有 Docker 桥接映射端口自动发现失效**：根因是 `docker==6.1.3` 与 `requests==2.32.3` 不兼容——
+  SDK 内部用 `http+docker://` URL scheme，requests 2.32.x 已不支持，导致 `docker.from_env()` 报
+  `Not supported URL scheme http+docker`、`get_docker_ports()` 一直返回空，所有映射端口丢失
+  （页面此前靠 config.json 的 service_type 手工标注维持显示）。
+- 修法（治本最小改动）：`requirements.txt` 固定 `requests==2.31.0`（urllib3 保持 2.2.2），保留 docker 6.1.3
+  （实测 docker 6.1.3 + requests 2.31 组合 `from_env()` 可连、拿到真实容器列表 10 个）。
+- 注意：容器内 app 用户读 docker.sock 还需正确 group_add（各机 sock gid 不同）；若部署未配，
+  连接会从 scheme 错误变为 PermissionError——属部署权限项，非本代码改动范围。
+
+### Notes
+- 双栈端口解析经复现证明无 bug（tcp+tcp6 同端口正确合并为 used），本次未改。
+
 ## [1.0.14] - 2026-11-24
 
 ### Notes
